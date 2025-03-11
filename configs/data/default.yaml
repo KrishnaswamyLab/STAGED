@@ -1,0 +1,8 @@
+# Root data directory
+data_dir: data
+
+# Derived paths using interpolation
+raw_data_dir: ${data.data_dir}/raw
+interim_data_dir: ${data.data_dir}/interim
+processed_data_dir: ${data.data_dir}/processed
+external_data_dir: ${data.data_dir}/external

@@ -4,7 +4,7 @@
 
 PROJECT_NAME = staged
 PYTHON_VERSION = 3.10
-PYTHON_INTERPRETER = python
+PYTHON_INTERPRETER = python3
 
 #################################################################################
 # COMMANDS                                                                      #
@@ -60,7 +60,8 @@ create_environment:
 
 ## Make dataset
 .PHONY: data
-data: requirements
+# data: requirements
+data: 
 	$(PYTHON_INTERPRETER) staged/dataset.py
 
 

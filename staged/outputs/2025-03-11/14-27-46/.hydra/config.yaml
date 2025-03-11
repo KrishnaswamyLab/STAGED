@@ -1,0 +1,13 @@
+data:
+  data_dir: data
+  raw_data_dir: ${data.data_dir}/raw
+  interim_data_dir: ${data_dir}/interim
+  processed_data_dir: ${data_dir}/processed
+  external_data_dir: ${data_dir}/external
+logging:
+  log_dir: ./logs
+  save_model: true
+  save_every_n_epochs: 5
+  tensorboard: true
+model:
+  models_dir: models

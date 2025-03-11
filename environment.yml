@@ -17,6 +17,8 @@ dependencies:
   - black
   - flake8
   - isort
+  - pytorch-lightning
+  - hydra-core
   - pip:
     - python-dotenv
     - mkdocs

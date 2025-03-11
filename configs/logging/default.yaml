@@ -1,0 +1,4 @@
+log_dir: "./logs"
+save_model: true
+save_every_n_epochs: 5
+tensorboard: true
