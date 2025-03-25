@@ -4,6 +4,7 @@ channels:
   - pyg
   - bioconda
   - defaults
+  - pyg
 
 dependencies:
   - python=3.10
@@ -23,16 +24,14 @@ dependencies:
   - jupyter
   - ipykernel
   - ipywidgets
+  - pyg
 
   # --------- loggers --------- #
   # - wandb
-  # - neptune-client
-  # - mlflow
-  # - comet-ml
-  # - aim>=3.16.2 # no lower than 3.16.2, see https://github.com/aimhubio/aim/issues/2550
 
   - pip>=23
   - pip:
       - hydra-optuna-sweeper
       - hydra-colorlog
       - rootutils
+      # - phate
