@@ -1,25 +1,38 @@
 name: staged
 channels:
   - conda-forge
+  - pyg
+  - bioconda
+  - defaults
+
 dependencies:
   - python=3.10
-  - pip
-  - typer
-  - loguru
-  - tqdm
-  - ipython
-  - jupyterlab
-  - matplotlib
-  - notebook
+  - pytorch=2.*
+  - torchvision=0.*
+  - lightning=2.*
+  - torchmetrics=0.*
+  - hydra-core=1.*
+  - rich=13.*
+  - pre-commit=3.*
+  - pytest=7.*
   - numpy
   - pandas
   - scikit-learn
-  - black
-  - flake8
-  - isort
-  - pytorch-lightning
-  - hydra-core
+  - matplotlib
+  - seaborn
+  - jupyter
+  - ipykernel
+  - ipywidgets
+
+  # --------- loggers --------- #
+  # - wandb
+  # - neptune-client
+  # - mlflow
+  # - comet-ml
+  # - aim>=3.16.2 # no lower than 3.16.2, see https://github.com/aimhubio/aim/issues/2550
+
+  - pip>=23
   - pip:
-    - python-dotenv
-    - mkdocs
-    - -e .
+      - hydra-optuna-sweeper
+      - hydra-colorlog
+      - rootutils

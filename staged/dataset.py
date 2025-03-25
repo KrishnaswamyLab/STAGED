@@ -18,9 +18,15 @@ def main(cfg: DictConfig):
     output_path = os.path.join(cfg.data.processed_data_dir,"dataset.csv")
     # ----------------------------------------------
 
-    # ---- REPLACE THIS WITH YOUR OWN CODE ----
     
     logger.info("Processing dataset...")
+
+    ## Creating spatial graphs from spatial data
+
+    ## Retrieving cell trajectories from MIOFlow
+
+    ## Retrieving GRN from RITINI
+
     for i in tqdm(range(10), total=10):
         if i == 5:
             logger.info("Something happened for iteration 5.")
