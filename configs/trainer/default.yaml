@@ -1,4 +1,9 @@
 # Training settings
+time_lags:
+  ligand_receptor: 5
+  receptor_gene: 3
+  ligand_gene: 1
+
 epochs: 20
 learning_rate: 0.001
 weight_decay: 0.0001
