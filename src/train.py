@@ -19,7 +19,7 @@ from omegaconf import DictConfig
 
 from utils.priorGraphs import retrieve_grn_priors
 from utils.cellTypes import retrieve_cell_types
-from staged.utils.ligand_receptors import retrieve_ligands, retrieve_receptors
+from src.utils.ligand_receptors import retrieve_ligands, retrieve_receptors
 
 # PyTorch geometric
 import torch_geometric
