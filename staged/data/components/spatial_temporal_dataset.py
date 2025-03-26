@@ -36,14 +36,15 @@ class SpatialTemporalDataset(Dataset):
     def process(self):
         """Process raw data into graph objects and save them."""
         raw_data = torch.load(os.path.join(self.raw_dir, "data.pt"))  # Example raw data
-        print(raw_data)
-        for i, graph in enumerate(raw_data):
-            data = Data(
-                x=graph["x"], 
-                edge_index=graph["edge_index"], 
-                y=graph["y"]
-            )
-            torch.save(data, os.path.join(self.processed_dir, f"graph_{i}.pt"))
+        (time, num_genes, num_cells_per_type) = raw_data.shape 
+        print(raw_data.shape) #should delete
+        # for i, graph in enumerate(raw_data):
+        #     data = Data(
+        #         x=graph["x"], 
+        #         edge_index=graph["edge_index"], 
+        #         y=graph["y"]
+        #     )
+        #     torch.save(data, os.path.join(self.processed_dir, f"graph_{i}.pt"))
 
     def len(self):
         return len(self.processed_file_names)
