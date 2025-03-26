@@ -1,19 +1,25 @@
-from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
-from loguru import logger
+
+from pathlib import Path
 from tqdm import tqdm
 import os
 import hydra
 from omegaconf import DictConfig, OmegaConf
+import numpy as np
+
+
+import hydra
+import lightning as L
+import rootutils
+import torch
+import pytorch_lightning as pl
+from lightning import Callback, LightningDataModule, LightningModule, Trainer
+from lightning.pytorch.loggers import Logger
+from omegaconf import DictConfig
 
 from utils.priorGraphs import retrieve_grn_priors
 from utils.cellTypes import retrieve_cell_types
 from staged.utils.ligand_receptors import retrieve_ligands, retrieve_receptors
-
-import torch
-import pytorch_lightning as pl
-
-import numpy as np
 
 # PyTorch geometric
 import torch_geometric
@@ -74,8 +80,22 @@ def main(cfg: DictConfig) -> Optional[float]:
     graph_val_loader = geom_data.DataLoader(test_dataset, batch_size=cfg.data.batch_size)  # Additional loader for a larger datasets
     graph_test_loader = geom_data.DataLoader(test_dataset, batch_size=cfg.data.batch_size)
     
+
+
+    ###### DATAMODULE ######
+
+    print(f"Instantiating datamodule <{cfg.data._target_}>")
+    datamodule: LightningDataModule = hydra.utils.instantiate(cfg.data)
+
+    # Data( x = Node feature matrix with shape [num_nodes, num_node_features],
+    #       edge_index = Graph connectivity in COO format with shape [2, num_edges]., 
+    #       edge_attr = Edge feature matrix with shape [num_edges, num_edge_features]. ,
+    #       y = Graph-level or node-level ground-truth labels with arbitrary shape.
+    # )
+
     ###### TRAINING ######
     pl.seed_everything(42)
+
     # Create a PyTorch Lightning trainer with the generation callback
     root_dir = os.path.join(CHECKPOINT_PATH, "GraphLevel" + model_name)
     os.makedirs(root_dir, exist_ok=True)
