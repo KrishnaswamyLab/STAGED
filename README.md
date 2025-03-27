@@ -75,4 +75,4 @@ The naming scheme looks like this:
 
 pjb - Your initials; this is helpful for knowing who created the notebook and prevents collisions from people working in the same notebook.
 
-data-source-1 - A description of what the notebook covers
+data-source-1 - A description of what the notebook cover
