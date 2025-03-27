@@ -74,6 +74,12 @@ class SpatialTemporalDataModule(LightningDataModule):
         print(self.dataset)
         print((self.train_val_test_split))
 
+        #TODO define the temporal split.
+        # We need to think about the batches.
+        
+        # temporal split, not random split.
+        # We need to train first with the N first samples and predicting with the final samples.
+
         self.data_train, self.data_val, self.data_test = torch.utils.data.random_split(
             self.dataset,
             self.train_val_test_split

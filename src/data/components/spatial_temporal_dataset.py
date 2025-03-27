@@ -22,7 +22,7 @@ class SpatialTemporalDataset(Dataset):
     @property
     def raw_file_names(self):
         """List the raw files that must be found in the raw directory."""
-        return ["traj_gene_sp.pt"]  # Change based on your actual raw files
+        return ["data.pt"]  # Change based on your actual raw files
 
     @property
     def processed_file_names(self):
@@ -35,9 +35,15 @@ class SpatialTemporalDataset(Dataset):
 
     def process(self):
         """Process raw data into graph objects and save them."""
-        raw_data = torch.load(os.path.join(self.raw_dir, "data.pt"))  # Example raw data
-        (time, num_genes, num_cells_per_type) = raw_data.shape 
+
         ##TODO correct this processing step
+        raw_data = torch.load(os.path.join(self.raw_dir, "data.pt"))  # Example raw data
+
+        (time, num_cells, 2) = spatial_data.shape 
+        (time, num_cells, genes) = raw_data.shape 
+        (num_cell_types, graph_priors) = prior_graphs_data.shape
+        (num_cells,1) = cell_types.shape # cell types label for each cell on the dataset
+
         print(raw_data.shape) #should delete
         for i, graph in enumerate(raw_data):
             data = Data(
@@ -56,3 +62,4 @@ class SpatialTemporalDataset(Dataset):
 
 if __name__ == "__main__":
     dataset = SpatialTemporalDataset(root='data')
+    dataset.process()

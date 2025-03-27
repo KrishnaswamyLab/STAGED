@@ -508,3 +508,11 @@ class CellSimulation:
     
         plt.tight_layout()
         return fig, ax
+    
+    def save_simulation_results():
+        #TODO save all data in the format:
+        # (time, num_cells, 2) = spatial_data.shape 
+        # (time, num_cells, genes) = raw_data.shape 
+        # (num_cell_types, graph_priors) = prior_graphs_data.shape
+        # (num_cells,1) or (num_cells,num_cell_types)  = cell_types.shape # cell types label for each cell on the dataset
+        return
