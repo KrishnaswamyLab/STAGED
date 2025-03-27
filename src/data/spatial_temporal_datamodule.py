@@ -5,10 +5,10 @@ from lightning import LightningDataModule
 from torch.utils.data import ConcatDataset, DataLoader, Dataset, random_split
 from torchvision.transforms import transforms
 
-from components.spatial_temporal_dataset import SpatialTemporalDataset
+from src.data.components.spatial_temporal_dataset import SpatialTemporalDataset
 
 class SpatialTemporalDataModule(LightningDataModule):
-    """`LightningDataModule` for the MNIST dataset.
+    """`LightningDataModule`.
 
     This allows you to share a full dataset without explaining how to download,
     split, transform and process the data.
@@ -44,6 +44,8 @@ class SpatialTemporalDataModule(LightningDataModule):
         self.data_val: Optional[Dataset] = None
         self.data_test: Optional[Dataset] = None
 
+        self.train_val_test_split = train_val_test_split
+        self.dataset = SpatialTemporalDataset(root=data_dir)
         self.batch_size_per_device = batch_size
         
 
@@ -69,6 +71,9 @@ class SpatialTemporalDataModule(LightningDataModule):
         :param stage: The stage to setup. Either `"fit"`, `"validate"`, `"test"`, or `"predict"`. Defaults to ``None``.
         """
         # Use random_split to divide the dataset
+        print(self.dataset)
+        print((self.train_val_test_split))
+
         self.data_train, self.data_val, self.data_test = torch.utils.data.random_split(
             self.dataset,
             self.train_val_test_split

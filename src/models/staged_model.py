@@ -1,10 +1,16 @@
 from typing import Any, Dict, Tuple
 
 import torch
+import torch.nn as nn
+import torch.optim as optim
 from lightning import LightningModule
 from torchmetrics import MaxMetric, MeanMetric
 from torchmetrics.classification.accuracy import Accuracy
 
+# PyTorch geometric
+import torch_geometric.nn as geom_nn
+
+from src.models.components.gnn_model import GNNModel
 
 class STAGEDModel(LightningModule):
     def __init__(self, **model_kwargs):
@@ -12,6 +18,8 @@ class STAGEDModel(LightningModule):
         # Saving hyperparameters
         self.save_hyperparameters()
 
+        print(model_kwargs)
+        
         self.model = GraphGNNModel(**model_kwargs)
         self.loss_module = nn.BCEWithLogitsLoss() if self.hparams.c_out == 1 else nn.CrossEntropyLoss()
 
