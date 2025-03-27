@@ -21,6 +21,8 @@ class SpatialTemporalDataModule(LightningDataModule):
         self,
         data_dir: str = "data/",
         train_val_test_split: Tuple[int, int, int] = (55_000, 5_000, 10_000),
+        time_lag: int = 1,
+        num_neighbors: int = 5,
         batch_size: int = 64,
         num_workers: int = 0,
         pin_memory: bool = False,
@@ -39,13 +41,14 @@ class SpatialTemporalDataModule(LightningDataModule):
         # also ensures init params will be stored in ckpt
         self.save_hyperparameters(logger=False)
 
-        
         self.data_train: Optional[Dataset] = None
         self.data_val: Optional[Dataset] = None
         self.data_test: Optional[Dataset] = None
 
         self.train_val_test_split = train_val_test_split
-        self.dataset = SpatialTemporalDataset(root=data_dir)
+        self.time_lag = time_lag
+
+        self.dataset = SpatialTemporalDataset(root=data_dir,time_lag=self.time_lag)
         self.batch_size_per_device = batch_size
         
 
@@ -171,6 +174,7 @@ class SpatialTemporalDataModule(LightningDataModule):
         }
 
 if __name__ == "__main__":
-    dataset = SpatialTemporalDataset(root='data')
-    dm = SpatialTemporalDataModule(dataset, batch_size=32)
+    # dataset = SpatialTemporalDataset(root='data',time_lag=1)
+    dataset = []
+    dm = SpatialTemporalDataModule(dataset, batch_size=32, time_lag=1,num_neighbors=5)
     _ = SpatialTemporalDataModule()
