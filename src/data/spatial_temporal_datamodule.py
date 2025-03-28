@@ -48,7 +48,8 @@ class SpatialTemporalDataModule(LightningDataModule):
         self.train_val_test_split = train_val_test_split
         self.time_lag = time_lag
 
-        self.dataset = SpatialTemporalDataset(root=data_dir,time_lag=self.time_lag)
+        self.dataset = SpatialTemporalDataset(root=data_dir,time_lag=self.time_lag,num_neighbors=num_neighbors)
+
         self.batch_size_per_device = batch_size
         
 
@@ -174,7 +175,5 @@ class SpatialTemporalDataModule(LightningDataModule):
         }
 
 if __name__ == "__main__":
-    # dataset = SpatialTemporalDataset(root='data',time_lag=1)
-    dataset = []
-    dm = SpatialTemporalDataModule(dataset, batch_size=32, time_lag=1,num_neighbors=5)
-    _ = SpatialTemporalDataModule()
+    dm = SpatialTemporalDataModule(batch_size=32, time_lag=1,num_neighbors=5)
+    # _ = SpatialTemporalDataModule()

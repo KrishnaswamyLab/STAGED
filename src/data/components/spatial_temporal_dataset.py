@@ -19,10 +19,14 @@ from scipy.spatial import KDTree
 
 class SpatialTemporalDataset(Dataset):
     def __init__(self, root, time_lag, num_neighbors, transform=None, pre_transform=None):
-        super().__init__(root, transform, pre_transform)
+
         self.time_lag = time_lag
         self.num_neighbors = num_neighbors
         self.prior_graphs = None
+
+        print(f"Initialized with time_lag: {self.time_lag}, num_neighbors: {self.num_neighbors}")
+        super().__init__(root, transform, pre_transform)
+
 
     @property
     def raw_file_names(self):
@@ -47,7 +51,7 @@ class SpatialTemporalDataset(Dataset):
         """Process raw spatial and gene expression data into graph objects and save them."""
         
         # Load raw data
-        gene_trajectories = torch.load(os.path.join(self.raw_dir, "data.pt"))  # (time, num_cells, genes)
+        gene_trajectories = torch.load(os.path.join(self.raw_dir, "raw_data.pt"))  # (time, num_cells, genes)
         spatial_time_series = torch.load(os.path.join(self.raw_dir, "spatial_data.pt"))  # (time, num_cells, 2)
         cell_types = torch.load(os.path.join(self.raw_dir, "cell_types.pt"))  # (num_cells, 1)
 
@@ -56,8 +60,9 @@ class SpatialTemporalDataset(Dataset):
         self.prior_graphs = prior_graphs
 
         num_timepoints, num_cells, num_genes = gene_trajectories.shape
-        num_cell_types, _ = prior_graphs.shape
+        # num_cell_types, _ = prior_graphs.shape
 
+        print('Loaded all data')
         # Iterate through timepoints to create dynamic graphs
         for t in range(self.time_lag, num_timepoints):
             cell_type_specific_grns = []
@@ -70,14 +75,13 @@ class SpatialTemporalDataset(Dataset):
                 cell_GRN = self.retrieveCellGRN(cell_type,t)
 
                 # Find neighboring cells and connect ligand-receptor interactions
-                neighbors = self.find_neighbor_cells(self.num_neighbors, spatial_time_series[t], cell_types)
+                neighbors = self.find_neighbor_cells(cell_idx, self.num_neighbors, spatial_time_series[t])
 
                 # Add ligand-receptor interactions based on current time_point and spatial data
                 final_GRN = self.add_neighbors_ligand_receptors_pairs(cell_GRN, neighbors)
                 
                 # Assign node features using time-lagged gene expression
                 h_c_hat = self.assign_node_features(final_GRN, gene_trajectories,neighbors)
-                
                 
                 # Convert to PyG Data object
                 graph_data = Data(
@@ -118,6 +122,16 @@ class SpatialTemporalDataset(Dataset):
         """
         # Retrieve the adjacency matrix or edge list for this cell type
         prior_graph = self.prior_graphs[cell_type]  # (num_nodes, num_nodes) or (2, num_edges)
+        # Convert adjacency matrix to edge_index
+        edge_index = torch.nonzero(prior_graph, as_tuple=True)
+
+        # Node features (optional: initialize with zeros or relevant features)
+        num_nodes = prior_graph.size(0)  # Assuming square adjacency matrix
+        x = torch.zeros((num_nodes, 1))  # Placeholder for node features
+
+        # Create PyG Data object
+        ##TODO: THIS IS WRONG!
+        prior_graph = Data(x=x, edge_index=edge_index)
         
         #TODO: Retrieve the CellGRN based on time points.
 
@@ -133,32 +147,30 @@ class SpatialTemporalDataset(Dataset):
         # return Data(x=x, edge_index=edge_index)
 
     
-    def find_neighbor_cells(num_neighbors: int, spatial_data: torch.Tensor, cell_types: torch.Tensor):
+    def find_neighbor_cells(self, cell_idx: int, num_neighbors: int, spatial_data: torch.Tensor):
         """
-        Find the `num_neighbors` closest cells for each cell based on spatial coordinates.
+        Find the `num_neighbors` closest cells to a specific cell based on spatial coordinates.
 
         Args:
+            cell_idx (int): Index of the cell for which to find neighbors.
             num_neighbors (int): Number of nearest neighbors to find.
             spatial_data (torch.Tensor): Tensor of shape (num_cells, 2) containing x, y coordinates.
-            cell_types (torch.Tensor): Tensor of shape (num_cells, 1) containing cell type labels.
 
         Returns:
-            List[List[int]]: A list where each index `i` contains the indices of `num_neighbors` nearest neighbors.
+            List[int]: A list containing the indices of `num_neighbors` nearest neighbors.
         """
-        num_cells = spatial_data.shape[0]
-        
         # Convert spatial data to numpy for KDTree
         tree = KDTree(spatial_data.cpu().numpy())  # Faster neighbor search
         
         # Find the `num_neighbors + 1` closest neighbors (including self)
-        _, neighbor_indices = tree.query(spatial_data.cpu().numpy(), k=num_neighbors + 1) 
+        _, neighbor_indices = tree.query(spatial_data[cell_idx].cpu().numpy(), k=num_neighbors + 1)
         
-        # Remove self from neighbors (first element in each row is the cell itself)
-        neighbor_indices = neighbor_indices[:, 1:]
+        # Remove self from neighbors (first element is the cell itself)
+        neighbor_indices = neighbor_indices[1:]
         
-        return neighbor_indices.tolist()  # Convert to list of lists
+        return neighbor_indices.tolist()  # Convert to list
     
-    def add_neighbors_ligand_receptors_pairs(cell_GRN: Data, neighbors: list):
+    def add_neighbors_ligand_receptors_pairs(self, cell_GRN: Data, neighbors: list):
         """
         Connect ligand-receptor interactions between the given cell's GRN and its neighbors.
 
@@ -171,33 +183,79 @@ class SpatialTemporalDataset(Dataset):
             Data: Updated PyG Data object with ligand-receptor connections added.
         """
 
-        edge_index = cell_GRN.edge_index.clone()  # Copy existing edges
+        edge_index = cell_GRN.edge_index # Copy existing edges
         num_nodes = cell_GRN.x.shape[0]  # Number of nodes in the current cell's GRN
 
         new_edges = []  # Store new ligand-receptor edges
-
-        for neighbor in neighbors:
-            print(neighbor)
+        for neighbor_idx in neighbors:
             # Example: Create an edge between ligand (node 0) and receptor (node 1) of the neighbor
             ligand_idx = 0  # Replace with actual ligand node index
             receptor_idx = 1  # Replace with actual receptor node index
 
             # Adjust receptor index based on neighbor's node indexing
-            neighbor_receptor_idx = receptor_idx + (neighbor * num_nodes)
+            neighbor_receptor_idx = receptor_idx + (neighbor_idx * num_nodes)
 
             new_edges.append([ligand_idx, neighbor_receptor_idx])  # Ligand → Neighbor Receptor
 
         if new_edges:
+            import pdb;
+            pdb.set_trace()
             new_edges = torch.tensor(new_edges, dtype=torch.long).T  # Convert to PyG format (2, num_edges)
             edge_index = torch.cat([edge_index, new_edges], dim=1)  # Append new edges
 
         return Data(x=cell_GRN.x, edge_index=edge_index)
 
-    def retrieve_genes_expression_environment(GRN_final, gene_expression, neighbors):
+    def retrieve_genes_expression_environment(self, GRN_final, gene_expression, neighbors):
         # Implement logic to retrieve gene expression for the environment
         # This is a placeholder function
         return gene_expression
     
+
+  # Extract cell IDs and time points
+
+        cell_ids = list(gene_expression_data.keys())
+        
+        # Determine all available time points
+        all_time_points = set()
+        for cell_id in cell_ids:
+            for gene_idx in range(self.num_genes):
+                if gene_idx in gene_expression_data[cell_id]:
+                    all_time_points.update(gene_expression_data[cell_id][gene_idx].keys())
+        time_points = sorted(all_time_points)
+        
+        # Calculate total time range
+        total_time_steps = len(time_points)
+        
+        # Set train_end_time if not provided
+        if train_end_time is None:
+            train_end_time = int(0.7 * total_time_steps)  # Use 70% for training by default
+        
+        # Separate train and test time points
+        train_time_points = [t for t in time_points if t < train_end_time]
+        test_time_points = [t for t in time_points if t >= train_end_time]
+        
+        # Calculate initial time steps needed
+        t_init = self.model.get_t_init()
+        
+        # Split training time points into train and validation sets
+        # but only use time points after t_init for predictable points
+        predictable_train_time_points = [t for t in train_time_points if t > t_init]
+        
+        if len(predictable_train_time_points) > 0:
+            num_val_points = max(1, int(validation_fraction * len(predictable_train_time_points)))
+            # Use the latest time points in the training set for validation
+            val_time_points = predictable_train_time_points[-num_val_points:]
+            # Use the remaining time points for training
+            train_time_points_for_loss = [t for t in predictable_train_time_points if t not in val_time_points]
+        else:
+            # If no predictable time points, we can't do validation
+            train_time_points_for_loss = predictable_train_time_points
+            val_time_points = []
+        
+        print(f"Time-based split: Training on time points {train_time_points}")
+        print(f"                  Validation on time points {val_time_points}")
+        print(f"                  Testing on time points {test_time_points}")
+
 if __name__ == "__main__":
     dataset = SpatialTemporalDataset(root='data',time_lag=1,num_neighbors=3)
     dataset.process()
