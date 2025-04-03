@@ -21,9 +21,9 @@ class STAGED(nn.Module):
         num_mlp_layers=2,
         dropout=0.1,
         delta_gl=1,  # Time lag for gene -> ligand
-        delta_lr=1,  # Time lag for ligand -> receptor 
-        delta_rg=1,  # Time lag for receptor -> gene
-        delta_gg=1,  # Time lag for gene -> gene
+        delta_lr=5,  # Time lag for ligand -> receptor 
+        delta_rg=3,  # Time lag for receptor -> gene
+        delta_gg=7,  # Time lag for gene -> gene
     ):
         super(STAGED, self).__init__()
         
@@ -61,9 +61,11 @@ class STAGED(nn.Module):
         Forward pass of the STAGED model
         
         Args:
-            cell_graphs: List of cell-specific graphs (one per cell)
-            gene_expression_history: Dictionary of gene expression histories
-            cell_positions: Spatial positions of cells
+            cell_graphs: List of cell-specific PyTorch Geometric Data objects
+            gene_expression_history: Tensor of shape (n_time_points, n_cells, n_genes)
+                Expression history of all cells 
+            cell_positions: Tensor of shape (n_time_points, n_cells, 2)
+                Spatial positions of cells across time
             
         Returns:
             predicted_expression: Predicted gene expression values

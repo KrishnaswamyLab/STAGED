@@ -23,6 +23,7 @@ from utils.visualization import (
     plot_gene_correlations
 )
 from trainer import STAGEDTrainer
+from utils.graph_constructor import GraphConstructor
 
 
 def parse_args():
@@ -121,8 +122,18 @@ def main():
     # Preprocess data
     gene_expression_data = preprocess_data(gene_expression_data)
     
-    # Create STAGED trainer
-    print("Initializing STAGED trainer...")
+    # Create graph constructor
+    graph_constructor = GraphConstructor(
+        genes=genes,
+        ligand_receptor_pairs=ligand_receptor_pairs,
+        cell_type_assignments=cell_type_assignments,
+        prior_grns=prior_grns
+    )
+    
+    # Create model
+    model = create_model(args, graph_constructor)
+    
+    # Create trainer
     trainer = STAGEDTrainer(
         genes=genes,
         ligand_receptor_pairs=ligand_receptor_pairs,
