@@ -572,7 +572,7 @@ def validate_node_features(graph, pyg_graph, gene_expression, cell_idx, time_poi
 
 def test_graph_constructor():
     """
-    Test the GraphConstructor class with toy data
+    Test the GraphConstructor class with toy data and visualize graphs for all cells
     """
     # Create test data
     data = create_test_data()
@@ -585,62 +585,11 @@ def test_graph_constructor():
         prior_grns=data['prior_grns']
     )
     
-    # Select a cell and time point for testing - use a larger time point to handle lags
-    cell_idx = 0  # Use the first cell
-    time_point = 10  # Use a larger time point to accommodate our time lags
+    # Use a larger time point to accommodate our time lags
+    time_point = 10
     
     # Visualize cell positions
     visualize_cell_positions(data['cell_positions'], time_point)
-    
-    # Test construct_base_graph
-    print(f"\nTesting construct_base_graph for cell {cell_idx}...")
-    base_graph = graph_constructor.construct_base_graph(cell_idx)
-    
-    # Print graph statistics
-    print(f"Base graph has {base_graph.number_of_nodes()} nodes and {base_graph.number_of_edges()} edges")
-    print("Base graph node types:")
-    node_types = {}
-    for node, attrs in base_graph.nodes(data=True):
-        node_type = attrs.get('type', 'gene')
-        node_types[node_type] = node_types.get(node_type, 0) + 1
-    for t, count in node_types.items():
-        print(f"  - {t}: {count} nodes")
-    
-    # Visualize the base graph
-    visualize_graph(base_graph, f"Base Graph for Cell {cell_idx}")
-    
-    # Test update_graph_with_neighbors
-    print(f"\nTesting update_graph_with_neighbors for cell {cell_idx} at time {time_point}...")
-    
-    # Try with different distance thresholds to see the effect
-    for distance_threshold in [10.0, 15.0]:
-        updated_graph = graph_constructor.update_graph_with_neighbors(
-            base_graph, cell_idx, data['cell_positions'], time_point,
-            distance_threshold=distance_threshold
-        )
-        
-        # Print graph statistics
-        print(f"\nWith distance threshold {distance_threshold}:")
-        print(f"Updated graph has {updated_graph.number_of_nodes()} nodes and {updated_graph.number_of_edges()} edges")
-        print("Updated graph node types:")
-        node_types = {}
-        for node, attrs in updated_graph.nodes(data=True):
-            node_type = attrs.get('type', 'gene')
-            node_types[node_type] = node_types.get(node_type, 0) + 1
-        for t, count in node_types.items():
-            print(f"  - {t}: {count} nodes")
-        
-        # Visualize the updated graph
-        visualize_graph(updated_graph, f"Updated Graph for Cell {cell_idx} (d={distance_threshold})")
-    
-    # Test assign_node_features with specified time lags
-    print(f"\nTesting assign_node_features for cell {cell_idx} at time {time_point}...")
-    
-    # Use distance threshold 15.0 to include diagonal neighbors
-    updated_graph = graph_constructor.update_graph_with_neighbors(
-        base_graph, cell_idx, data['cell_positions'], time_point,
-        distance_threshold=15.0
-    )
     
     # Define time lags as specified by the user
     delta_gl = 1  # Time lag for gene -> ligand
@@ -661,51 +610,131 @@ def test_graph_constructor():
         time_point = max_lag
         print(f"Adjusted time_point to {time_point} to handle time lags")
     
-    # Assign node features
-    pyg_graph = graph_constructor.assign_node_features(
-        updated_graph, cell_idx, time_point, data['gene_expression'],
-        delta_gl, delta_lr, delta_rg, delta_gg
-    )
-    
-    # Print PyTorch Geometric graph information
-    print(f"\nPyTorch Geometric graph:")
-    print(f"Number of nodes: {pyg_graph.num_nodes}")
-    print(f"Number of edges: {pyg_graph.num_edges}")
-    print(f"Node features shape: {pyg_graph.x.shape}")
-    print(f"Gene node indices: {pyg_graph.gene_node_indices}")
-    
-    # Validate node features
-    is_valid, node_features, mismatches = validate_node_features(
-        updated_graph, pyg_graph, data['gene_expression'], cell_idx, time_point,
-        delta_gl, delta_lr, delta_rg, delta_gg, graph_constructor.gene_indices
-    )
-    
-    # Visualize feature values for validation
-    visualize_feature_values(
-        updated_graph, data['gene_expression'], cell_idx, time_point,
-        delta_gl, delta_lr, delta_rg, delta_gg, node_features
-    )
-    
-    # Print validation results
-    if is_valid:
-        print("\n✅ Feature validation passed! All node features match expected values.")
-    else:
-        print("\n❌ Feature validation failed! Found mismatches:")
-        for mismatch in mismatches:
-            print(f"  - Node {mismatch['node']} ({mismatch['type']}): "
-                  f"Expected {mismatch['expected']:.4f}, got {mismatch['assigned']:.4f}")
-    
-    # Return test results for further analysis
-    return {
-        'base_graph': base_graph,
-        'updated_graph': updated_graph,
-        'pyg_graph': pyg_graph,
-        'data': data,
-        'feature_validation': {
-            'is_valid': is_valid,
-            'node_features': node_features,
-            'mismatches': mismatches
+    # Process each cell to create and visualize its graph
+    results = {}
+    for cell_idx in range(data['n_cells']):
+        print(f"\n{'='*50}")
+        print(f"TESTING CELL {cell_idx}")
+        print(f"{'='*50}")
+        
+        # Test construct_base_graph
+        print(f"\nTesting construct_base_graph for cell {cell_idx}...")
+        base_graph = graph_constructor.construct_base_graph(cell_idx)
+        
+        # Print graph statistics
+        print(f"Base graph has {base_graph.number_of_nodes()} nodes and {base_graph.number_of_edges()} edges")
+        print("Base graph node types:")
+        node_types = {}
+        for node, attrs in base_graph.nodes(data=True):
+            node_type = attrs.get('type', 'gene')
+            node_types[node_type] = node_types.get(node_type, 0) + 1
+        for t, count in node_types.items():
+            print(f"  - {t}: {count} nodes")
+        
+        # Visualize the base graph
+        visualize_graph(base_graph, f"Base Graph for Cell {cell_idx}")
+        
+        # Test update_graph_with_neighbors
+        print(f"\nTesting update_graph_with_neighbors for cell {cell_idx} at time {time_point}...")
+        
+        # Try with different distance thresholds to see the effect
+        for distance_threshold in [10.0, 15.0]:
+            updated_graph = graph_constructor.update_graph_with_neighbors(
+                base_graph, cell_idx, data['cell_positions'], time_point,
+                distance_threshold=distance_threshold
+            )
+            
+            # Print graph statistics
+            print(f"\nWith distance threshold {distance_threshold}:")
+            print(f"Updated graph has {updated_graph.number_of_nodes()} nodes and {updated_graph.number_of_edges()} edges")
+            print("Updated graph node types:")
+            node_types = {}
+            for node, attrs in updated_graph.nodes(data=True):
+                node_type = attrs.get('type', 'gene')
+                node_types[node_type] = node_types.get(node_type, 0) + 1
+            for t, count in node_types.items():
+                print(f"  - {t}: {count} nodes")
+            
+            # Visualize the updated graph
+            visualize_graph(updated_graph, f"Updated Graph for Cell {cell_idx} (d={distance_threshold})")
+        
+        # Test assign_node_features with specified time lags
+        print(f"\nTesting assign_node_features for cell {cell_idx} at time {time_point}...")
+        
+        # Use distance threshold 15.0 to include diagonal neighbors
+        updated_graph = graph_constructor.update_graph_with_neighbors(
+            base_graph, cell_idx, data['cell_positions'], time_point,
+            distance_threshold=15.0
+        )
+        
+        # Assign node features
+        pyg_graph = graph_constructor.assign_node_features(
+            updated_graph, cell_idx, time_point, data['gene_expression'],
+            delta_gl, delta_lr, delta_rg, delta_gg
+        )
+        
+        # Print PyTorch Geometric graph information
+        print(f"\nPyTorch Geometric graph:")
+        print(f"Number of nodes: {pyg_graph.num_nodes}")
+        print(f"Number of edges: {pyg_graph.num_edges}")
+        print(f"Node features shape: {pyg_graph.x.shape}")
+        print(f"Gene node indices: {pyg_graph.gene_node_indices}")
+        
+        # Validate node features
+        is_valid, node_features, mismatches = validate_node_features(
+            updated_graph, pyg_graph, data['gene_expression'], cell_idx, time_point,
+            delta_gl, delta_lr, delta_rg, delta_gg, graph_constructor.gene_indices
+        )
+        
+        # Visualize feature values for validation
+        visualize_feature_values(
+            updated_graph, data['gene_expression'], cell_idx, time_point,
+            delta_gl, delta_lr, delta_rg, delta_gg, node_features
+        )
+        
+        # Print validation results
+        if is_valid:
+            print(f"\n✅ Feature validation passed for Cell {cell_idx}! All node features match expected values.")
+        else:
+            print(f"\n❌ Feature validation failed for Cell {cell_idx}! Found mismatches:")
+            for mismatch in mismatches:
+                print(f"  - Node {mismatch['node']} ({mismatch['type']}): "
+                      f"Expected {mismatch['expected']:.4f}, got {mismatch['assigned']:.4f}")
+        
+        # Store results for this cell
+        results[cell_idx] = {
+            'base_graph': base_graph,
+            'updated_graph': updated_graph,
+            'pyg_graph': pyg_graph,
+            'feature_validation': {
+                'is_valid': is_valid,
+                'node_features': node_features,
+                'mismatches': mismatches
+            }
         }
+    
+    # Summary of validation results for all cells
+    print("\n" + "="*50)
+    print("VALIDATION SUMMARY FOR ALL CELLS")
+    print("="*50)
+    all_valid = True
+    for cell_idx in range(data['n_cells']):
+        is_valid = results[cell_idx]['feature_validation']['is_valid']
+        all_valid = all_valid and is_valid
+        status = "✅ PASSED" if is_valid else "❌ FAILED"
+        print(f"Cell {cell_idx}: {status}")
+    
+    # Final summary
+    if all_valid:
+        print("\n✅ All tests completed successfully for all cells!")
+    else:
+        print("\n❌ Tests completed with feature validation errors for some cells.")
+    
+    print("\nCheck the results directory for visualizations.")
+    
+    return {
+        'data': data,
+        'cell_results': results
     }
 
 
@@ -730,6 +759,65 @@ def print_gene_expression_table(gene_expression, n_time_points, n_cells, n_genes
             print(f"{c:4d} | " + " | ".join([f"{val:7.2f}" for val in values]))
 
 
+def visualize_all_cells_comparison(data, output_dir='results'):
+    """
+    Create a comparative visualization of all cells' positions and their neighborhoods
+    
+    Args:
+        data: Test data dictionary
+        output_dir: Directory to save the visualization
+    """
+    time_point = 10  # Use the same time point as in the test
+    
+    plt.figure(figsize=(12, 10))
+    
+    # Extract positions for the given time point
+    positions = data['cell_positions'][time_point].numpy()
+    
+    # Plot each cell
+    for i, pos in enumerate(positions):
+        plt.scatter(pos[0], pos[1], s=200, label=f"Cell {i}")
+        plt.text(pos[0] + 0.5, pos[1] + 0.5, f"Cell {i}", fontsize=14)
+    
+    # Draw connections between cells within threshold distance
+    for i, pos_i in enumerate(positions):
+        for j, pos_j in enumerate(positions):
+            if i != j:
+                distance = np.linalg.norm(pos_i - pos_j)
+                if distance <= 15.0:  # Using 15.0 as our larger threshold
+                    # Draw a line between cells
+                    plt.plot([pos_i[0], pos_j[0]], [pos_i[1], pos_j[1]], 
+                            'k--', alpha=0.3, linewidth=1)
+                    # Annotate with distance
+                    mid_x = (pos_i[0] + pos_j[0]) / 2
+                    mid_y = (pos_i[1] + pos_j[1]) / 2
+                    plt.text(mid_x, mid_y, f"{distance:.1f}", 
+                            fontsize=10, ha='center', va='center',
+                            bbox=dict(facecolor='white', alpha=0.7))
+    
+    # Draw distance circles for reference
+    for i, pos in enumerate(positions):
+        circle = plt.Circle((pos[0], pos[1]), 15.0, fill=False, linestyle='-', 
+                          alpha=0.3, color='green')
+        plt.gca().add_patch(circle)
+    
+    plt.title(f"Cell Positions and Connections at Time Point {time_point}")
+    plt.xlabel("X Position")
+    plt.ylabel("Y Position")
+    plt.grid(True, linestyle='--', alpha=0.7)
+    plt.axis('equal')
+    
+    # Create output directory if it doesn't exist
+    os.makedirs(output_dir, exist_ok=True)
+    
+    # Save the figure
+    output_file = os.path.join(output_dir, f"All_Cells_Comparison_t{time_point}.png")
+    plt.savefig(output_file, dpi=300, bbox_inches='tight')
+    print(f"Saved all cells comparison to {output_file}")
+    
+    plt.close()
+
+
 if __name__ == "__main__":
     # Create test data
     data = create_test_data()
@@ -747,13 +835,10 @@ if __name__ == "__main__":
             values = [data['gene_expression'][t, c, g].item() for g in range(data['n_genes'])]
             print(f"{c:4d} | " + " | ".join([f"{val:7.2f}" for val in values]))
     
+    # Create comparative visualization of all cells
+    visualize_all_cells_comparison(data)
+    
     # Run the tests
     results = test_graph_constructor()
-    
-    # Final summary
-    if results['feature_validation']['is_valid']:
-        print("\n✅ All tests completed successfully!")
-    else:
-        print("\n❌ Tests completed with feature validation errors.")
     
     print("\nCheck the results directory for visualizations.") 
