@@ -42,14 +42,25 @@ class TestGraphConstructor(unittest.TestCase):
             
             for gene_target in self.genes:
                 if gene_source != gene_target:
-                    if np.random.random() < 0.3:  # 30% chance of edge
+                    # Type A: Create a feed-forward network with feedback loops
+                    if gene_source == "gene_0" and gene_target in ["gene_1", "gene_2", "gene_3"]:
                         self.prior_grns["type_A"].add_edge(gene_source, gene_target)
-                    if np.random.random() < 0.3:  # 30% chance of edge
+                    elif gene_source == "gene_1" and gene_target in ["gene_3", "gene_4"]:
+                        self.prior_grns["type_A"].add_edge(gene_source, gene_target)
+                    elif gene_source == "gene_2" and gene_target in ["gene_3", "gene_4"]:
+                        self.prior_grns["type_A"].add_edge(gene_source, gene_target)
+                    elif gene_source == "gene_3" and gene_target in ["gene_0", "gene_4"]:
+                        self.prior_grns["type_A"].add_edge(gene_source, gene_target)
+                    
+                    # Type B: Create a different network with cycles
+                    if gene_source == "gene_2" and gene_target in ["gene_3", "gene_4", "gene_1"]:
                         self.prior_grns["type_B"].add_edge(gene_source, gene_target)
-        
-        # Sample gene expression history
-        self.gene_expression_history = {}
-        for cell_id in self.cell_ids:
+                    elif gene_source == "gene_3" and gene_target in ["gene_4", "gene_0", "gene_1"]:
+                        self.prior_grns["type_B"].add_edge(gene_source, gene_target)
+                    elif gene_source == "gene_4" and gene_target in ["gene_0", "gene_2"]:
+                        self.prior_grns["type_B"].add_edge(gene_source, gene_target)
+                    elif gene_source == "gene_1" and gene_target in ["gene_0", "gene_3"]:
+                        self.prior_grns["type_B"].add_edge(gene_source, gene_target)
             self.gene_expression_history[cell_id] = {}
             for gene_idx in range(len(self.genes)):
                 self.gene_expression_history[cell_id][gene_idx] = {}
@@ -209,8 +220,8 @@ def create_test_data():
     # Define gene names
     genes = [f"gene_{i}" for i in range(n_genes)]
     
-    # Define cell type assignments: all cells as type 0
-    cell_type_assignments = torch.zeros(n_cells, dtype=torch.long)
+    # Define cell type assignments: cells 0,1 as type 0 and cells 2,3 as type 1
+    cell_type_assignments = torch.tensor([0, 0, 1, 1], dtype=torch.long)
     
     # Define ligand-receptor pairs
     ligand_receptor_pairs = [
@@ -218,17 +229,44 @@ def create_test_data():
         ("gene_2", "gene_3"),  # gene_2 is ligand, gene_3 is receptor
     ]
     
-    # Create a prior gene regulatory network (GRN) for cell type 0
-    prior_grn = nx.DiGraph()
-    # Add all genes as nodes
-    for i in range(n_genes):
-        prior_grn.add_node(f"gene_{i}")
-    # Add some regulatory edges
-    prior_grn.add_edge("gene_0", "gene_4")  # gene_0 regulates gene_4
-    prior_grn.add_edge("gene_1", "gene_5")  # gene_1 regulates gene_5
-    prior_grn.add_edge("gene_2", "gene_0")  # gene_2 regulates gene_0
+    # Define receptor-gene pairs (selective connections)
+    receptor_gene_pairs = [
+        ("gene_1", "gene_4"),  # receptor gene_1 regulates gene_4
+        ("gene_1", "gene_5"),  # receptor gene_1 also regulates gene_5
+        ("gene_3", "gene_1"),  # receptor gene_3 regulates gene_1
+        ("gene_3", "gene_4"),  # receptor gene_3 also regulates gene_4
+        ("gene_4", "gene_2"),  # gene_4 regulates gene_2
+        ("gene_4", "gene_3"),  # gene_4 regulates gene_3
+        ("gene_5", "gene_3"),  # gene_5 regulates gene_3
+        ("gene_5", "gene_0"),  # gene_5 regulates gene_0
+    ]
     
-    prior_grns = {0: prior_grn}
+    # Create prior gene regulatory networks (GRNs) for each cell type
+    # GRN for cell type 0
+    prior_grn_0 = nx.DiGraph()
+    for i in range(n_genes):
+        prior_grn_0.add_node(f"gene_{i}")
+    # Add regulatory edges for cell type 0
+    prior_grn_0.add_edge("gene_4", "gene_2")  # gene_4 regulates gene_2
+    prior_grn_0.add_edge("gene_4", "gene_3")  # gene_4 regulates gene_3
+    prior_grn_0.add_edge("gene_5", "gene_3")  # gene_5 regulates gene_3
+    prior_grn_0.add_edge("gene_5", "gene_0")  # gene_5 regulates gene_0
+    prior_grn_0.add_edge("gene_1", "gene_5")  # gene_1 regulates gene_5
+    prior_grn_0.add_edge("gene_2", "gene_4")  # gene_2 regulates gene_4
+    
+    # GRN for cell type 1
+    prior_grn_1 = nx.DiGraph()
+    for i in range(n_genes):
+        prior_grn_1.add_node(f"gene_{i}")
+    # Add regulatory edges for cell type 1
+    prior_grn_1.add_edge("gene_4", "gene_3")  # gene_4 regulates gene_3
+    prior_grn_1.add_edge("gene_5", "gene_3")  # gene_5 regulates gene_3
+    prior_grn_1.add_edge("gene_3", "gene_1")  # gene_3 regulates gene_1
+    prior_grn_1.add_edge("gene_1", "gene_4")  # gene_1 regulates gene_4
+    prior_grn_1.add_edge("gene_0", "gene_2")  # gene_0 regulates gene_2
+    prior_grn_1.add_edge("gene_2", "gene_5")  # gene_2 regulates gene_5
+    
+    prior_grns = {0: prior_grn_0, 1: prior_grn_1}
     
     return {
         'gene_expression': gene_expression,
@@ -236,6 +274,7 @@ def create_test_data():
         'genes': genes,
         'cell_type_assignments': cell_type_assignments,
         'ligand_receptor_pairs': ligand_receptor_pairs,
+        'receptor_gene_pairs': receptor_gene_pairs,
         'prior_grns': prior_grns,
         'n_time_points': n_time_points,
         'n_cells': n_cells,
@@ -569,6 +608,45 @@ def validate_node_features(graph, pyg_graph, gene_expression, cell_idx, time_poi
     
     return is_valid, node_features, mismatches
 
+def validate_receptor_connections(graph, receptor_gene_pairs):
+    """
+    Validate that receptor-gene connections in the graph match the specified pairs
+    
+    Args:
+        graph: NetworkX graph
+        receptor_gene_pairs: List of (receptor, gene) pairs
+        
+    Returns:
+        is_valid: Boolean indicating whether connections match specifications
+        mismatches: List of unexpected or missing connections
+    """
+    is_valid = True
+    mismatches = []
+    
+    # Create lookup set of valid receptor-gene pairs
+    valid_pairs = set()
+    for receptor, target in receptor_gene_pairs:
+        if receptor.startswith('gene_'):  # Only process receptor genes
+            receptor_node = f"r_{receptor}"
+            valid_pairs.add((receptor_node, target))
+    
+    # Check all receptor node connections in graph
+    for node in graph.nodes():
+        if node.startswith('r_'):  # Found a receptor node
+            for target in graph.successors(node):
+                # Check if this connection is in valid pairs
+                if (node, target) not in valid_pairs:
+                    is_valid = False
+                    mismatches.append(f"Unexpected connection: {node} -> {target}")
+    
+    # Check that valid pairs that could exist do exist
+    for receptor_node, target in valid_pairs:
+        if receptor_node in graph.nodes() and target in graph.nodes():
+            if not graph.has_edge(receptor_node, target):
+                is_valid = False
+                mismatches.append(f"Missing connection: {receptor_node} -> {target}")
+    
+    return is_valid, mismatches
 
 def test_graph_constructor():
     """
@@ -577,10 +655,11 @@ def test_graph_constructor():
     # Create test data
     data = create_test_data()
     
-    # Initialize the GraphConstructor
+    # Initialize the GraphConstructor with receptor_gene_pairs
     graph_constructor = GraphConstructor(
         genes=data['genes'],
         ligand_receptor_pairs=data['ligand_receptor_pairs'],
+        receptor_gene_pairs=data['receptor_gene_pairs'],
         cell_type_assignments=data['cell_type_assignments'],
         prior_grns=data['prior_grns']
     )
@@ -685,6 +764,16 @@ def test_graph_constructor():
             updated_graph, pyg_graph, data['gene_expression'], cell_idx, time_point,
             delta_gl, delta_lr, delta_rg, delta_gg, graph_constructor.gene_indices
         )
+        
+        # Validate receptor connections
+        print("\nValidating receptor-gene connections...")
+        is_valid_receptor, mismatches_receptor = validate_receptor_connections(updated_graph, data['receptor_gene_pairs'])
+        if is_valid_receptor:
+            print("✅ Receptor connections are correct")
+        else:
+            print("❌ Found issues with receptor connections:")
+            for mismatch in mismatches_receptor:
+                print(f"  - {mismatch}")
         
         # Visualize feature values for validation
         visualize_feature_values(

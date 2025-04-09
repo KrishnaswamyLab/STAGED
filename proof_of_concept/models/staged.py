@@ -3,8 +3,6 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch_geometric.nn import GATConv
 from torch_geometric.data import Data, Batch
-import networkx as nx
-import numpy as np
 
 
 class STAGED(nn.Module):
@@ -39,80 +37,71 @@ class STAGED(nn.Module):
         
         # GAT layers
         self.gat_layers = nn.ModuleList()
-        self.gat_layers.append(GATConv(self.input_dim, hidden_dim, heads=1, dropout=dropout))
+        self.gat_layers.append(GATConv(self.input_dim, hidden_dim, heads=1, dropout=dropout)) # optionally use GATv2Conv? TODO investigate difference.
         
         for _ in range(num_gat_layers - 1):
             self.gat_layers.append(GATConv(hidden_dim, hidden_dim, heads=1, dropout=dropout))
         
-        # MLP for prediction
-        self.mlp_layers = nn.ModuleList()
-        self.mlp_layers.append(nn.Linear(hidden_dim, hidden_dim))
+        # MLP for prediction using Sequential
+        mlp_layers = []
+        mlp_layers.append(nn.Linear(hidden_dim, hidden_dim))
+        mlp_layers.append(nn.ReLU())
+        mlp_layers.append(nn.Dropout(dropout))
         
         for _ in range(num_mlp_layers - 2):
-            self.mlp_layers.append(nn.Linear(hidden_dim, hidden_dim))
-            
-        self.mlp_layers.append(nn.Linear(hidden_dim, 1))
+            mlp_layers.append(nn.Linear(hidden_dim, hidden_dim))
+            mlp_layers.append(nn.ReLU())
+            mlp_layers.append(nn.Dropout(dropout))
         
-        self.dropout = nn.Dropout(dropout)
-        self.relu = nn.ReLU()
+        mlp_layers.append(nn.Linear(hidden_dim, 1))
+        self.mlp = nn.Sequential(*mlp_layers)
     
-    def forward(self, cell_graphs, gene_expression_history, cell_positions):
+    def forward(self, batch_data):
         """
         Forward pass of the STAGED model
         
         Args:
-            cell_graphs: List of cell-specific PyTorch Geometric Data objects
-            gene_expression_history: Tensor of shape (n_time_points, n_cells, n_genes)
-                Expression history of all cells 
-            cell_positions: Tensor of shape (n_time_points, n_cells, 2)
-                Spatial positions of cells across time
+            batch_data: PyTorch Geometric Data or Batch object
+                Can be a single graph or a batch of graphs
             
         Returns:
-            predicted_expression: Predicted gene expression values
-            attention_weights: Attention weights from GAT layers
+            node_embeddings: Node embeddings after GAT layers
+            attention_weights: Attention weights from the last GAT layer
         """
-        predictions = {}
-        attention_weights = {}
+        x = batch_data.x
+        edge_index = batch_data.edge_index
         
-        # Process each cell's graph
-        for cell_idx, graph in enumerate(cell_graphs):
-            # Apply GAT layers
-            x = graph.x
-            edge_index = graph.edge_index
-            
-            for gat_layer in self.gat_layers:
-                x, attention = gat_layer(x, edge_index, return_attention_weights=True)
-                x = self.relu(x)
-                x = self.dropout(x)
-            
-            # Apply MLP for final prediction
-            node_embeddings = x
-            
-            gene_predictions = {}
-            # Extract gene nodes (not ligand or receptor nodes)
-            gene_nodes = graph.gene_node_indices
-            
-            for gene_idx, node_idx in enumerate(gene_nodes):
-                gene_embedding = node_embeddings[node_idx]
-                
-                # Pass through MLP
-                x_mlp = gene_embedding
-                for mlp_layer in self.mlp_layers[:-1]:
-                    x_mlp = mlp_layer(x_mlp)
-                    x_mlp = self.relu(x_mlp)
-                    x_mlp = self.dropout(x_mlp)
-                
-                # Final prediction
-                gene_prediction = self.mlp_layers[-1](x_mlp)
-                # Reshape to match expected dimensions [1, 1] instead of [1]
-                gene_prediction = gene_prediction.view(1, 1)
-                gene_predictions[gene_idx] = gene_prediction
-            
-            predictions[cell_idx] = gene_predictions
-            attention_weights[cell_idx] = attention
+        # Track attention weights from the last layer
+        attention = None
         
-        return predictions, attention_weights
-
+        # Apply GAT layers
+        for gat_layer in self.gat_layers:
+            # The GATConv automatically respects graph boundaries in batched data
+            x, attention = gat_layer(x, edge_index, return_attention_weights=True)
+            x = F.relu(x)
+            x = F.dropout(x, p=0.1, training=self.training)
+        
+        return x, attention
+    
+    def predict_genes(self, node_embeddings, gene_indices):
+        """
+        Generate predictions for gene nodes
+        
+        Args:
+            node_embeddings: Embeddings for all nodes
+            gene_indices: Indices of the gene nodes to predict
+            
+        Returns:
+            predictions: Gene expression predictions [num_genes, 1]
+        """
+        # Get embeddings for gene nodes only
+        gene_embeddings = node_embeddings[gene_indices]
+        
+        # Apply MLP to get predictions
+        predictions = self.mlp(gene_embeddings)
+        
+        return predictions
+        
     def get_t_init(self):
         """Return the initial time steps needed before prediction can start"""
         return max(self.delta_gl, self.delta_lr, self.delta_rg, self.delta_gg) 

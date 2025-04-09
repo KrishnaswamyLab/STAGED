@@ -10,25 +10,34 @@ class GraphConstructor:
     It handles the creation of gene, ligand, and receptor nodes, as well as
     the connections between them.
     """
-    def __init__(self, genes, ligand_receptor_pairs, cell_type_assignments, prior_grns):
+    def __init__(self, genes, ligand_receptor_pairs, receptor_gene_pairs, cell_type_assignments, prior_grns):
         """
         Initialize the graph constructor
         
         Args:
             genes: List of gene identifiers
             ligand_receptor_pairs: List of (ligand, receptor) gene pairs
+            receptor_gene_pairs: List of (receptor, gene) pairs for selective connections
             cell_type_assignments: Tensor or list of shape (n_cells,) assigning cell types
             prior_grns: Dictionary mapping cell types to prior GRNs (as networkx graphs)
         """
         self.genes = genes
         self.gene_indices = {gene: idx for idx, gene in enumerate(genes)}
         self.ligand_receptor_pairs = ligand_receptor_pairs
+        self.receptor_gene_pairs = receptor_gene_pairs
         self.cell_type_assignments = cell_type_assignments
         self.prior_grns = prior_grns
         
         # Identify receptor and ligand genes
         self.receptor_genes = set(receptor for _, receptor in ligand_receptor_pairs)
         self.ligand_genes = set(ligand for ligand, _ in ligand_receptor_pairs)
+        
+        # Create a mapping of which genes each receptor connects to
+        self.receptor_targets = {}
+        for receptor, target_gene in receptor_gene_pairs:
+            if receptor not in self.receptor_targets:
+                self.receptor_targets[receptor] = set()
+            self.receptor_targets[receptor].add(target_gene)
         
     def construct_base_graph(self, cell_idx):
         """
@@ -62,9 +71,10 @@ class GraphConstructor:
             receptor_node = f"r_{gene}"
             base_grn.add_node(receptor_node, type="receptor", gene=gene)
             
-            # Connect receptor node to all genes
-            for target_gene in self.genes:
-                base_grn.add_edge(receptor_node, target_gene)
+            # Connect receptor node only to specified target genes
+            if gene in self.receptor_targets:
+                for target_gene in self.receptor_targets[gene]:
+                    base_grn.add_edge(receptor_node, target_gene)
                 
         # Add ligand output nodes for ligand genes
         for gene in self.ligand_genes:

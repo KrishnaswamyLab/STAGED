@@ -7,6 +7,7 @@ import networkx as nx
 
 from models.staged import STAGED
 from utils.graph_constructor import GraphConstructor
+from utils.graph_data_handler import GraphDataHandler
 
 
 class STAGEDTrainer:
@@ -172,74 +173,64 @@ class STAGEDTrainer:
         # Use all cell indices for training
         train_cells = list(range(n_cells))
         
+        # Initialize model and data handler
+        model = STAGED(
+            num_genes=self.num_genes,
+            delta_gl=self.delta_gl,
+            delta_lr=self.delta_lr,
+            delta_rg=self.delta_rg,
+            delta_gg=self.delta_gg
+        )
+        model = model.to(self.device)
+
+        data_handler = GraphDataHandler(model, device=self.device)
+
         # Training loop
         for epoch in range(num_epochs):
             self.model.train()
             epoch_loss = 0.0
             num_batches = 0
             
-            # Process each time point sequentially (for training)
-            for t in train_time_points_for_loss:
-                # Construct cell-specific graphs for this time point
-                cell_graphs = {}
+            # Construct cell-specific graphs for this time point
+            cell_graphs = []
+            for cell_idx in range(n_cells):
+                # Create base graph
+                base_graph = self.graph_constructor.construct_base_graph(cell_idx)
                 
-                for cell_idx in train_cells:
-                    # Create base graph
-                    base_graph = self.graph_constructor.construct_base_graph(cell_idx)
-                    
-                    # Update with neighbor information
-                    updated_graph = self.graph_constructor.update_graph_with_neighbors(
-                        base_graph, cell_idx, cell_positions, t,
-                        distance_threshold=distance_threshold
-                    )
-                    
-                    # Assign node features with time lags
-                    graph_data = self.graph_constructor.assign_node_features(
-                        updated_graph, cell_idx, t, gene_expression_history,
-                        self.delta_gl, self.delta_lr, self.delta_rg, self.delta_gg
-                    )
-                    
-                    cell_graphs[cell_idx] = graph_data.to(self.device)
+                # Update with neighbor information
+                updated_graph = self.graph_constructor.update_graph_with_neighbors(
+                    base_graph, cell_idx, cell_positions, epoch,
+                    distance_threshold=distance_threshold
+                )
                 
-                # Process cells in batches
-                for batch_start in range(0, len(train_cells), batch_size):
-                    batch_cells = train_cells[batch_start:batch_start + batch_size]
-                    
-                    # Reset gradients
-                    self.optimizer.zero_grad()
-                    
-                    # Forward pass
-                    batch_graphs = [cell_graphs[cell_idx] for cell_idx in batch_cells]
-                    predictions, _ = self.model(batch_graphs, gene_expression_history, cell_positions)
-                    
-                    # Calculate loss
-                    batch_loss = 0.0
-                    for i, cell_idx in enumerate(batch_cells):
-                        for gene_idx in range(self.num_genes):
-                            # Get actual data from our tensor
-                            target = gene_expression_data[t, cell_idx, gene_idx].unsqueeze(0).unsqueeze(0)
-                            
-                            if gene_idx in predictions[i]:
-                                pred = predictions[i][gene_idx]
-                                batch_loss += self.criterion(pred, target)
-                    
-                    # Backward pass and optimization
-                    batch_loss.backward()
-                    self.optimizer.step()
-                    
-                    # Update metrics
-                    epoch_loss += batch_loss.item()
-                    num_batches += 1
+                # Assign node features with time lags
+                graph_data = self.graph_constructor.assign_node_features(
+                    updated_graph, cell_idx, epoch, gene_expression_history,
+                    self.delta_gl, self.delta_lr, self.delta_rg, self.delta_gg
+                )
                 
-                # Update gene expression history with predictions
-                with torch.no_grad():
-                    for i, cell_idx in enumerate(train_cells):
-                        if i in predictions:
-                            for gene_idx, pred in predictions[i].items():
-                                gene_expression_history[t, cell_idx, gene_idx] = pred.item()
+                cell_graphs.append(graph_data)
             
-            # Calculate average epoch loss
-            epoch_loss = epoch_loss / num_batches if num_batches > 0 else float('inf')
+            # Process all graphs and get tensor predictions
+            predictions, _ = data_handler.process_cell_graphs(cell_graphs, num_genes=self.num_genes, batch_size=batch_size)
+            
+            # Now predictions is a tensor of shape (n_cells, n_genes)
+            # You can add it to your gene_expression_history at the right time point
+            # For example:
+            gene_expression_history[epoch] = predictions
+            
+            # Calculate loss against next time point ground truth
+            next_time_point = epoch + 1
+            if next_time_point < n_time_points:
+                target = gene_expression_data[next_time_point]  # Shape: (n_cells, n_genes)
+                loss = self.criterion(predictions, target)
+                # Backward pass and optimization
+                self.optimizer.zero_grad()
+                loss.backward()
+                self.optimizer.step()
+            
+            # Update metrics
+            epoch_loss = loss.item()
             train_losses.append(epoch_loss)
             
             # Validation on validation time points (all cells)
