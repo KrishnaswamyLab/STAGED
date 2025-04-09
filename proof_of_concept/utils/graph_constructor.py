@@ -250,4 +250,8 @@ class GraphConstructor:
         pyg_graph = Data(x=features, edge_index=edge_index)
         pyg_graph.gene_node_indices = gene_node_indices
         
+        # Store node names and types
+        pyg_graph.node_names = node_list  # Store the ordered list of node names
+        pyg_graph.node_types = [graph.nodes[node].get('type', 'gene') for node in node_list]  # Store node types
+        
         return pyg_graph 

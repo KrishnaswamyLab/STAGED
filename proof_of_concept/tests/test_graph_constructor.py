@@ -13,75 +13,7 @@ from utils.graph_constructor import GraphConstructor
 
 
 class TestGraphConstructor(unittest.TestCase):
-    
-    def setUp(self):
-        """Set up test data for graph constructor tests"""
-        # Sample genes
-        self.genes = [f"gene_{i}" for i in range(5)]
-        
-        # Sample ligand-receptor pairs
-        self.lr_pairs = [
-            ("gene_0", "gene_1"),
-            ("gene_2", "gene_3")
-        ]
-        
-        # Sample cell type assignments
-        self.cell_ids = ["cell_0", "cell_1", "cell_2"]
-        self.cell_types = {"cell_0": "type_A", "cell_1": "type_A", "cell_2": "type_B"}
-        
-        # Sample prior GRNs
-        self.prior_grns = {
-            "type_A": nx.DiGraph(),
-            "type_B": nx.DiGraph()
-        }
-        
-        # Add edges to prior GRNs
-        for gene_source in self.genes:
-            self.prior_grns["type_A"].add_node(gene_source)
-            self.prior_grns["type_B"].add_node(gene_source)
-            
-            for gene_target in self.genes:
-                if gene_source != gene_target:
-                    # Type A: Create a feed-forward network with feedback loops
-                    if gene_source == "gene_0" and gene_target in ["gene_1", "gene_2", "gene_3"]:
-                        self.prior_grns["type_A"].add_edge(gene_source, gene_target)
-                    elif gene_source == "gene_1" and gene_target in ["gene_3", "gene_4"]:
-                        self.prior_grns["type_A"].add_edge(gene_source, gene_target)
-                    elif gene_source == "gene_2" and gene_target in ["gene_3", "gene_4"]:
-                        self.prior_grns["type_A"].add_edge(gene_source, gene_target)
-                    elif gene_source == "gene_3" and gene_target in ["gene_0", "gene_4"]:
-                        self.prior_grns["type_A"].add_edge(gene_source, gene_target)
-                    
-                    # Type B: Create a different network with cycles
-                    if gene_source == "gene_2" and gene_target in ["gene_3", "gene_4", "gene_1"]:
-                        self.prior_grns["type_B"].add_edge(gene_source, gene_target)
-                    elif gene_source == "gene_3" and gene_target in ["gene_4", "gene_0", "gene_1"]:
-                        self.prior_grns["type_B"].add_edge(gene_source, gene_target)
-                    elif gene_source == "gene_4" and gene_target in ["gene_0", "gene_2"]:
-                        self.prior_grns["type_B"].add_edge(gene_source, gene_target)
-                    elif gene_source == "gene_1" and gene_target in ["gene_0", "gene_3"]:
-                        self.prior_grns["type_B"].add_edge(gene_source, gene_target)
-            self.gene_expression_history[cell_id] = {}
-            for gene_idx in range(len(self.genes)):
-                self.gene_expression_history[cell_id][gene_idx] = {}
-                for t in range(5):  # 5 time points
-                    self.gene_expression_history[cell_id][gene_idx][t] = np.random.normal(0, 1)
-        
-        # Sample cell positions
-        self.cell_positions = {}
-        for cell_id in self.cell_ids:
-            self.cell_positions[cell_id] = {}
-            for t in range(5):  # 5 time points
-                self.cell_positions[cell_id][t] = [np.random.uniform(-10, 10), np.random.uniform(-10, 10)]
-        
-        # Create graph constructor
-        self.graph_constructor = GraphConstructor(
-            genes=self.genes,
-            ligand_receptor_pairs=self.lr_pairs,
-            cell_type_assignments=self.cell_types,
-            prior_grns=self.prior_grns
-        )
-    
+
     def test_initialization(self):
         """Test that the GraphConstructor initializes correctly"""
         # Check receptor and ligand genes are identified
@@ -191,7 +123,7 @@ class TestGraphConstructor(unittest.TestCase):
         self.assertEqual(len(pyg_graph.gene_node_indices), len(self.genes))
 
 
-def create_test_data():
+def create_square_grid_data():
     """Create toy data for testing the GraphConstructor"""
     # Define dimensions - increase time points to handle larger lags
     n_time_points = 15  # Increased from 5 to accommodate larger time lags
@@ -282,7 +214,109 @@ def create_test_data():
     }
 
 
-def visualize_graph(graph, title, output_dir='results'):
+def create_hex_grid_test_data():
+    """Create toy data for testing the GraphConstructor with a hexagonal grid layout"""
+    # Define dimensions
+    n_time_points = 15
+    n_cells = 7  # Center cell plus 6 surrounding cells
+    n_genes = 6
+    
+    # Create gene expression tensor: (n_time_points, n_cells, n_genes)
+    gene_expression = torch.zeros((n_time_points, n_cells, n_genes))
+    for t in range(n_time_points):
+        for c in range(n_cells):
+            for g in range(n_genes):
+                gene_expression[t, c, g] = t*100 + c*10 + g
+    
+    # Create spatial positions tensor: (n_time_points, n_cells, 2)
+    # Arrange cells in a hexagonal pattern with distance 10 between adjacent cells
+    cell_positions = torch.zeros((n_time_points, n_cells, 2))
+    
+    # Constants for hexagonal layout
+    hex_distance = 10.0
+    angle_step = 2 * np.pi / 6  # 60 degrees in radians
+    
+    for t in range(n_time_points):
+        # Center cell (index 0)
+        cell_positions[t, 0] = torch.tensor([0.0, 0.0])
+        
+        # Surrounding cells (indices 1-6)
+        for i in range(6):
+            angle = i * angle_step
+            x = hex_distance * np.cos(angle)
+            y = hex_distance * np.sin(angle)
+            cell_positions[t, i+1] = torch.tensor([x, y])
+    
+    # Define gene names
+    genes = [f"gene_{i}" for i in range(n_genes)]
+    
+    # Define cell type assignments: alternating pattern
+    cell_type_assignments = torch.tensor([0, 1, 0, 1, 0, 1, 0], dtype=torch.long)
+    
+    # Define ligand-receptor pairs
+    ligand_receptor_pairs = [
+        ("gene_0", "gene_1"),  # gene_0 is ligand, gene_1 is receptor
+        ("gene_2", "gene_3"),  # gene_2 is ligand, gene_3 is receptor
+    ]
+    
+    # Define receptor-gene pairs (selective connections)
+    receptor_gene_pairs = [
+        ("gene_1", "gene_4"),  # receptor gene_1 regulates gene_4
+        ("gene_1", "gene_5"),  # receptor gene_1 also regulates gene_5
+        ("gene_3", "gene_1"),  # receptor gene_3 regulates gene_1
+        ("gene_3", "gene_4"),  # receptor gene_3 also regulates gene_4
+        ("gene_4", "gene_2"),  # gene_4 regulates gene_2
+        ("gene_4", "gene_3"),  # gene_4 regulates gene_3
+        ("gene_5", "gene_3"),  # gene_5 regulates gene_3
+        ("gene_5", "gene_0"),  # gene_5 regulates gene_0
+    ]
+    
+    # Create prior gene regulatory networks (GRNs) for each cell type
+    # GRN for cell type 0
+    prior_grn_0 = nx.DiGraph()
+    for i in range(n_genes):
+        prior_grn_0.add_node(f"gene_{i}")
+    # Add regulatory edges for cell type 0
+    prior_grn_0.add_edge("gene_4", "gene_2")
+    prior_grn_0.add_edge("gene_4", "gene_3")
+    prior_grn_0.add_edge("gene_5", "gene_3")
+    prior_grn_0.add_edge("gene_5", "gene_0")
+    prior_grn_0.add_edge("gene_1", "gene_5")
+    prior_grn_0.add_edge("gene_2", "gene_4")
+    
+    # GRN for cell type 1
+    prior_grn_1 = nx.DiGraph()
+    for i in range(n_genes):
+        prior_grn_1.add_node(f"gene_{i}")
+    # Add regulatory edges for cell type 1
+    prior_grn_1.add_edge("gene_4", "gene_3")
+    prior_grn_1.add_edge("gene_5", "gene_3")
+    prior_grn_1.add_edge("gene_3", "gene_1")
+    prior_grn_1.add_edge("gene_1", "gene_4")
+    prior_grn_1.add_edge("gene_0", "gene_2")
+    prior_grn_1.add_edge("gene_2", "gene_5")
+    
+    prior_grns = {0: prior_grn_0, 1: prior_grn_1}
+    
+    return {
+        'gene_expression': gene_expression,
+        'cell_positions': cell_positions,
+        'genes': genes,
+        'cell_type_assignments': cell_type_assignments,
+        'ligand_receptor_pairs': ligand_receptor_pairs,
+        'receptor_gene_pairs': receptor_gene_pairs,
+        'prior_grns': prior_grns,
+        'n_time_points': n_time_points,
+        'n_cells': n_cells,
+        'n_genes': n_genes
+    }
+
+# create_test_data = create_square_grid_data
+create_test_data = create_hex_grid_test_data
+
+
+
+def visualize_graph(graph, title, output_dir='results', save_plot=True, show_plot=False, figsize=(10, 10), return_pos=False):
     """
     Visualize a NetworkX graph with node types shown in different colors
     
@@ -290,8 +324,10 @@ def visualize_graph(graph, title, output_dir='results'):
         graph: NetworkX graph to visualize
         title: Title for the plot
         output_dir: Directory to save the visualization
+        save_plot: Whether to save the plot to file (default: True)
+        show_plot: Whether to display the plot (default: False)
     """
-    plt.figure(figsize=(14, 10))
+    plt.figure(figsize=figsize)
     
     # Group nodes by type
     gene_nodes = [n for n, d in graph.nodes(data=True) if d.get('type', 'gene') == 'gene']
@@ -368,18 +404,25 @@ def visualize_graph(graph, title, output_dir='results'):
     plt.axis('off')
     plt.tight_layout()
     
-    # Create output directory if it doesn't exist
-    os.makedirs(output_dir, exist_ok=True)
+    # Save and/or show the plot
+    if save_plot:
+        # Create output directory if it doesn't exist
+        os.makedirs(output_dir, exist_ok=True)
+        
+        # Save the figure
+        output_file = os.path.join(output_dir, f"{title.replace(' ', '_')}.png")
+        plt.savefig(output_file, dpi=300, bbox_inches='tight')
+        print(f"Saved graph visualization to {output_file}")
     
-    # Save the figure
-    output_file = os.path.join(output_dir, f"{title.replace(' ', '_')}.png")
-    plt.savefig(output_file, dpi=300, bbox_inches='tight')
-    print(f"Saved graph visualization to {output_file}")
+    if show_plot:
+        plt.show()
+    else:
+        plt.close()
     
-    plt.close()
+    if return_pos:
+        return pos
 
-
-def visualize_cell_positions(cell_positions, time_point, output_dir='results'):
+def visualize_cell_positions(cell_positions, time_point, output_dir='results', save_plot=True, show_plot=False):
     """
     Visualize cell positions at a specific time point
     
@@ -387,6 +430,8 @@ def visualize_cell_positions(cell_positions, time_point, output_dir='results'):
         cell_positions: Tensor of shape (n_time_points, n_cells, 2)
         time_point: Time point to visualize
         output_dir: Directory to save the visualization
+        save_plot: Whether to save the plot to file (default: True)
+        show_plot: Whether to display the plot (default: False)
     """
     plt.figure(figsize=(8, 8))
     
@@ -413,20 +458,24 @@ def visualize_cell_positions(cell_positions, time_point, output_dir='results'):
     plt.grid(True, linestyle='--', alpha=0.7)
     plt.axis('equal')
     
-    # Create output directory if it doesn't exist
-    os.makedirs(output_dir, exist_ok=True)
+    if save_plot:
+        # Create output directory if it doesn't exist
+        os.makedirs(output_dir, exist_ok=True)
+        
+        # Save the figure
+        output_file = os.path.join(output_dir, f"Cell_Positions_t{time_point}.png")
+        plt.savefig(output_file, dpi=300, bbox_inches='tight')
+        print(f"Saved cell positions visualization to {output_file}")
     
-    # Save the figure
-    output_file = os.path.join(output_dir, f"Cell_Positions_t{time_point}.png")
-    plt.savefig(output_file, dpi=300, bbox_inches='tight')
-    print(f"Saved cell positions visualization to {output_file}")
-    
-    plt.close()
+    if show_plot:
+        plt.show()
+    else:
+        plt.close()
 
 
 def visualize_feature_values(graph, gene_expression, cell_idx, time_point, 
                            delta_gl, delta_lr, delta_rg, delta_gg, node_features,
-                           output_dir='results'):
+                           output_dir='results', save_plot=True, show_plot=False):
     """
     Visualize feature values for nodes in the graph
     
@@ -438,6 +487,8 @@ def visualize_feature_values(graph, gene_expression, cell_idx, time_point,
         delta_gl, delta_lr, delta_rg, delta_gg: Time lags
         node_features: Dictionary mapping nodes to assigned features
         output_dir: Directory to save the visualization
+        save_plot: Whether to save the plot to file (default: True)
+        show_plot: Whether to display the plot (default: False)
     """
     plt.figure(figsize=(14, 10))
     
@@ -521,15 +572,19 @@ def visualize_feature_values(graph, gene_expression, cell_idx, time_point,
     plt.title(f"Node Feature Validation for Cell {cell_idx} at Time {time_point}")
     plt.tight_layout()
     
-    # Create output directory if it doesn't exist
-    os.makedirs(output_dir, exist_ok=True)
+    if save_plot:
+        # Create output directory if it doesn't exist
+        os.makedirs(output_dir, exist_ok=True)
+        
+        # Save the figure
+        output_file = os.path.join(output_dir, f"Feature_Validation_Cell{cell_idx}_t{time_point}.png")
+        plt.savefig(output_file, dpi=300, bbox_inches='tight')
+        print(f"Saved feature validation to {output_file}")
     
-    # Save the figure
-    output_file = os.path.join(output_dir, f"Feature_Validation_Cell{cell_idx}_t{time_point}.png")
-    plt.savefig(output_file, dpi=300, bbox_inches='tight')
-    print(f"Saved feature validation to {output_file}")
-    
-    plt.close()
+    if show_plot:
+        plt.show()
+    else:
+        plt.close()
 
 
 def validate_node_features(graph, pyg_graph, gene_expression, cell_idx, time_point,
@@ -634,7 +689,11 @@ def validate_receptor_connections(graph, receptor_gene_pairs):
     for node in graph.nodes():
         if node.startswith('r_'):  # Found a receptor node
             for target in graph.successors(node):
-                # Check if this connection is in valid pairs
+                # Skip if target is not a gene node (e.g. another receptor)
+                if not target.startswith('gene_'):
+                    continue
+                    
+                # Check if this connection is valid
                 if (node, target) not in valid_pairs:
                     is_valid = False
                     mismatches.append(f"Unexpected connection: {node} -> {target}")
@@ -647,6 +706,7 @@ def validate_receptor_connections(graph, receptor_gene_pairs):
                 mismatches.append(f"Missing connection: {receptor_node} -> {target}")
     
     return is_valid, mismatches
+
 
 def test_graph_constructor():
     """
@@ -848,13 +908,15 @@ def print_gene_expression_table(gene_expression, n_time_points, n_cells, n_genes
             print(f"{c:4d} | " + " | ".join([f"{val:7.2f}" for val in values]))
 
 
-def visualize_all_cells_comparison(data, output_dir='results'):
+def visualize_all_cells_comparison(data, output_dir='results', save_plot=True, show_plot=False):
     """
     Create a comparative visualization of all cells' positions and their neighborhoods
     
     Args:
         data: Test data dictionary
         output_dir: Directory to save the visualization
+        save_plot: Whether to save the plot to file (default: True)
+        show_plot: Whether to display the plot (default: False)
     """
     time_point = 10  # Use the same time point as in the test
     
@@ -896,15 +958,19 @@ def visualize_all_cells_comparison(data, output_dir='results'):
     plt.grid(True, linestyle='--', alpha=0.7)
     plt.axis('equal')
     
-    # Create output directory if it doesn't exist
-    os.makedirs(output_dir, exist_ok=True)
+    if save_plot:
+        # Create output directory if it doesn't exist
+        os.makedirs(output_dir, exist_ok=True)
+        
+        # Save the figure
+        output_file = os.path.join(output_dir, f"All_Cells_Comparison_t{time_point}.png")
+        plt.savefig(output_file, dpi=300, bbox_inches='tight')
+        print(f"Saved all cells comparison to {output_file}")
     
-    # Save the figure
-    output_file = os.path.join(output_dir, f"All_Cells_Comparison_t{time_point}.png")
-    plt.savefig(output_file, dpi=300, bbox_inches='tight')
-    print(f"Saved all cells comparison to {output_file}")
-    
-    plt.close()
+    if show_plot:
+        plt.show()
+    else:
+        plt.close()
 
 
 if __name__ == "__main__":

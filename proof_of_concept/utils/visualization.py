@@ -4,6 +4,84 @@ import networkx as nx
 from matplotlib.animation import FuncAnimation
 import seaborn as sns
 
+def visualize_attention_graph(pyg_graph, edge_index, attention_weights, pos):
+    """
+    Visualize a graph with attention weights and node types.
+    
+    Args:
+        pyg_graph: PyTorch Geometric graph object containing node names and types
+        edge_index: Tensor containing edge indices
+        attention_weights: Tensor containing attention weights
+            from `node_embeddings, (edge_index, attention_weights) = model(pyg_graph)`
+        pos: Dictionary mapping node names to positions
+        
+    Returns:
+        None. Displays the graph visualization.
+    """
+    # Create a NetworkX graph from edge_index with node names
+    G = nx.DiGraph()
+    node_names = pyg_graph.node_names
+    edge_list = [(node_names[src], node_names[dst]) for src, dst in edge_index.t().tolist()]
+    G.add_edges_from(edge_list)
+
+    # Compute average attention weights across heads for visualization
+    avg_attention = attention_weights.mean(dim=1).detach().numpy()
+
+    # Create figure
+    fig, ax = plt.subplots(figsize=(12, 10))
+
+    # Create color map for node types
+    node_type_colors = {
+        'gene': 'lightblue',
+        'receptor': 'lightgreen', 
+        'ligand': 'orange',
+        'input_ligand': 'salmon'
+    }
+
+    # Get node colors based on type
+    node_colors = [node_type_colors[node_type] for node_type in pyg_graph.node_types]
+
+    # Draw graph with attention weights as edge colors and labels
+    nx.draw(G, pos, ax=ax, with_labels=True, node_color=node_colors,
+            edge_color=avg_attention, edge_cmap=plt.cm.Blues, width=2,
+            labels={node: node for node in G.nodes()})
+
+    # Add edge labels showing attention weights
+    # Create edge labels dictionary including self-loops
+    edge_labels = {}
+    for (src, dst), att in zip(edge_index.t().tolist(), avg_attention):
+        src_name = node_names[src]
+        dst_name = node_names[dst]
+        edge_labels[(src_name, dst_name)] = f'{att:.3f}'
+        # For self-loops, adjust position slightly to make label visible
+        if src == dst:
+            pos_adj = {node: (x + 0.1, y + 0.1) for node, (x, y) in pos.items()}
+            nx.draw_networkx_edge_labels(G, pos_adj, edge_labels={(src_name, dst_name): edge_labels[(src_name, dst_name)]}, ax=ax)
+    
+    # Draw labels for non-self-loop edges
+    non_self_loops = {(s, d): l for (s, d), l in edge_labels.items() if s != d}
+    nx.draw_networkx_edge_labels(G, pos, edge_labels=non_self_loops, ax=ax)
+
+    # Add colorbar for attention weights
+    sm = plt.cm.ScalarMappable(cmap=plt.cm.Blues,
+                              norm=plt.Normalize(vmin=avg_attention.min(),
+                                               vmax=avg_attention.max()))
+    sm.set_array([])
+    plt.colorbar(sm, ax=ax, label='Average Attention Weight')
+
+    # Add legend for node types
+    legend_elements = [plt.Line2D([0], [0], marker='o', color='w', 
+                                markerfacecolor=color, label=node_type, markersize=10)
+                      for node_type, color in node_type_colors.items()]
+    ax.legend(handles=legend_elements, loc='upper right', title='Node Types')
+
+    ax2 = ax.twinx()
+    ax2.set_yticks([])
+
+    ax.set_title('Graph with Attention Weights and Values')
+
+    plt.tight_layout()
+    plt.show()
 
 def plot_gene_trajectories(gene_expression_data, predictions, cell_id, gene_indices, figsize=(12, 8)):
     """

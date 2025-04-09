@@ -22,6 +22,7 @@ class STAGED(nn.Module):
         delta_lr=5,  # Time lag for ligand -> receptor 
         delta_rg=3,  # Time lag for receptor -> gene
         delta_gg=7,  # Time lag for gene -> gene
+        add_self_loops=True,
     ):
         super(STAGED, self).__init__()
         
@@ -31,16 +32,18 @@ class STAGED(nn.Module):
         self.delta_lr = delta_lr
         self.delta_rg = delta_rg
         self.delta_gg = delta_gg
+        self.add_self_loops = add_self_loops
         
         # Initial feature dimensions
         self.input_dim = 1  # Single gene expression value
         
         # GAT layers
+        assert num_gat_layers == 1, "Must have exactly one GAT layer"
         self.gat_layers = nn.ModuleList()
-        self.gat_layers.append(GATConv(self.input_dim, hidden_dim, heads=1, dropout=dropout)) # optionally use GATv2Conv? TODO investigate difference.
+        self.gat_layers.append(GATConv(self.input_dim, hidden_dim, heads=1, dropout=dropout, add_self_loops=add_self_loops)) # optionally use GATv2Conv? TODO investigate difference.
         
         for _ in range(num_gat_layers - 1):
-            self.gat_layers.append(GATConv(hidden_dim, hidden_dim, heads=1, dropout=dropout))
+            self.gat_layers.append(GATConv(hidden_dim, hidden_dim, heads=1, dropout=dropout, add_self_loops=add_self_loops))
         
         # MLP for prediction using Sequential
         mlp_layers = []
@@ -77,7 +80,7 @@ class STAGED(nn.Module):
         # Apply GAT layers
         for gat_layer in self.gat_layers:
             # The GATConv automatically respects graph boundaries in batched data
-            x, attention = gat_layer(x, edge_index, return_attention_weights=True)
+            x, attention = gat_layer(x, edge_index, return_attention_weights=True) # only returns the last layer's attention weights
             x = F.relu(x)
             x = F.dropout(x, p=0.1, training=self.training)
         
