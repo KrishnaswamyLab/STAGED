@@ -1,3 +1,9 @@
+"""
+THIS IS A PLACEHOLDER FILE. NEED TO REWRITE COMPLETELY.
+- need to call the graph data handler to process the cell graphs
+- when training, update the history with predictions, with a specified time window
+- train with MSE loss
+"""
 import torch
 import torch.nn as nn
 import torch.optim as optim
