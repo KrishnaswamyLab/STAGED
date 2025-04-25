@@ -48,7 +48,7 @@ def visualize_graph(graph, title, output_dir='results', save_plot=False, show_pl
         cell = graph.nodes[node].get('cell')
         gene = graph.nodes[node].get('gene')
         # Position based on cell ID (horizontal spread) and gene (vertical position)
-        pos[node] = (1.5 + int(cell) * 0.2, 0.0 + int(gene.split('_')[1]) * 0.1)
+        pos[node] = (1.5 + int(cell) * 0.6, -0.3 + int(gene.split('_')[1]) * 0.3)
     
     # Draw the nodes with different colors by type
     nx.draw_networkx_nodes(graph, pos, nodelist=gene_nodes, node_color='lightblue', 
@@ -112,7 +112,7 @@ def visualize_graph(graph, title, output_dir='results', save_plot=False, show_pl
         return pos
 
 
-def visualize_attention_graph(pyg_graph, edge_index, attention_weights, pos):
+def visualize_attention_graph(pyg_graph, edge_index, attention_weights, pos, figsize=(12, 10), show_labels=True):
     """
     Visualize a graph with attention weights and node types.
     
@@ -122,6 +122,8 @@ def visualize_attention_graph(pyg_graph, edge_index, attention_weights, pos):
         attention_weights: Tensor containing attention weights
             from `node_embeddings, (edge_index, attention_weights) = model(pyg_graph)`
         pos: Dictionary mapping node names to positions
+        figsize: Tuple specifying figure size
+        show_labels: Whether to show node labels (default: True)
         
     Returns:
         None. Displays the graph visualization.
@@ -132,11 +134,14 @@ def visualize_attention_graph(pyg_graph, edge_index, attention_weights, pos):
     edge_list = [(node_names[src], node_names[dst]) for src, dst in edge_index.t().tolist()]
     G.add_edges_from(edge_list)
 
+    # Create mapping from node names to their types
+    node_name_to_type = {name: type_ for name, type_ in zip(pyg_graph.node_names, pyg_graph.node_types)}
+
     # Compute average attention weights across heads for visualization
     avg_attention = attention_weights.mean(dim=1).detach().numpy()
 
     # Create figure
-    fig, ax = plt.subplots(figsize=(12, 10))
+    fig, ax = plt.subplots(figsize=figsize)
 
     # Create color map for node types
     node_type_colors = {
@@ -146,13 +151,13 @@ def visualize_attention_graph(pyg_graph, edge_index, attention_weights, pos):
         'input_ligand': 'salmon'
     }
 
-    # Get node colors based on type
-    node_colors = [node_type_colors[node_type] for node_type in pyg_graph.node_types]
+    # Get node colors based on type, using the NetworkX graph node order
+    node_colors = [node_type_colors[node_name_to_type[node]] for node in G.nodes()]
 
     # Draw graph with attention weights as edge colors and labels
-    nx.draw(G, pos, ax=ax, with_labels=True, node_color=node_colors,
+    nx.draw(G, pos, ax=ax, with_labels=show_labels, node_color=node_colors,
             edge_color=avg_attention, edge_cmap=plt.cm.Blues, width=2,
-            labels={node: node for node in G.nodes()})
+            labels={node: node for node in G.nodes()} if show_labels else {})
 
     # Add edge labels showing attention weights
     # Create edge labels dictionary including self-loops
@@ -160,7 +165,7 @@ def visualize_attention_graph(pyg_graph, edge_index, attention_weights, pos):
     for (src, dst), att in zip(edge_index.t().tolist(), avg_attention):
         src_name = node_names[src]
         dst_name = node_names[dst]
-        edge_labels[(src_name, dst_name)] = f'{att:.3f}'
+        edge_labels[(src_name, dst_name)] = f'{att:.2f}'
         # For self-loops, adjust position slightly to make label visible
         if src == dst:
             pos_adj = {node: (x + 0.1, y + 0.1) for node, (x, y) in pos.items()}
@@ -181,7 +186,7 @@ def visualize_attention_graph(pyg_graph, edge_index, attention_weights, pos):
     legend_elements = [plt.Line2D([0], [0], marker='o', color='w', 
                                 markerfacecolor=color, label=node_type, markersize=10)
                       for node_type, color in node_type_colors.items()]
-    ax.legend(handles=legend_elements, loc='upper right', title='Node Types')
+    ax.legend(handles=legend_elements, loc='lower right', title='Node Types')
 
     ax2 = ax.twinx()
     ax2.set_yticks([])
