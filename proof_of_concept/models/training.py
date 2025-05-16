@@ -8,6 +8,19 @@ from models.staged import STAGED
 from models.inference_processor import STAGEDProcessor, PredictionOutput
 
 @dataclass
+class ModelConfig:
+    """Configuration for STAGED model architecture"""
+    hidden_dim: int = 64
+    num_gat_layers: int = 1
+    num_mlp_layers: int = 2
+    dropout: float = 0.1
+    delta_gl: int = 1
+    delta_lr: int = 5
+    delta_rg: int = 3
+    delta_gg: int = 7
+    add_self_loops: bool = True
+
+@dataclass
 class TrainingConfig:
     """Configuration for training"""
     max_iterations: int = 1000
@@ -16,6 +29,7 @@ class TrainingConfig:
     batch_size: int = 32
     distance_threshold: float = 10.0
     device: Optional[torch.device] = None
+    model_config: Optional[ModelConfig] = None
 
 @dataclass
 class TrainingOutput:
@@ -57,20 +71,22 @@ def train_staged_model(
     # Setup configuration
     if config is None:
         config = TrainingConfig()
+    if config.model_config is None:
+        config.model_config = ModelConfig()
     device = config.device or torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     
     # Initialize model
     model = STAGED(
         num_genes=len(genes),
-        hidden_dim=64,  # Could be made configurable
-        num_gat_layers=1,
-        num_mlp_layers=2,
-        dropout=0.1,
-        delta_gl=1,
-        delta_lr=5,
-        delta_rg=3,
-        delta_gg=7,
-        add_self_loops=True,
+        hidden_dim=config.model_config.hidden_dim,
+        num_gat_layers=config.model_config.num_gat_layers,
+        num_mlp_layers=config.model_config.num_mlp_layers,
+        dropout=config.model_config.dropout,
+        delta_gl=config.model_config.delta_gl,
+        delta_lr=config.model_config.delta_lr,
+        delta_rg=config.model_config.delta_rg,
+        delta_gg=config.model_config.delta_gg,
+        add_self_loops=config.model_config.add_self_loops,
     ).to(device)
     
     # Initialize processor

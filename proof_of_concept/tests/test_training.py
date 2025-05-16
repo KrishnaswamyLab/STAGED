@@ -12,7 +12,7 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 parent_dir = os.path.dirname(current_dir)
 sys.path.insert(0, parent_dir)
 
-from models.training import train_staged_model, TrainingConfig
+from models.training import train_staged_model, TrainingConfig, ModelConfig
 from test_graph_constructor import create_square_grid_data
 
 def create_simple_test_data(
@@ -69,12 +69,21 @@ class TestTraining(unittest.TestCase):
             if isinstance(value, torch.Tensor):
                 cls.complex_data[key] = value.to(cls.device)
         
+        # Model configuration
+        cls.model_config = ModelConfig(
+            hidden_dim=32,  # Smaller for testing
+            num_gat_layers=1,
+            num_mlp_layers=2,
+            dropout=0.1
+        )
+        
         # Training configuration
         cls.config = TrainingConfig(
             max_iterations=10,  # Small number for testing
             learning_rate=0.01,
             batch_size=2,
-            device=cls.device
+            device=cls.device,
+            model_config=cls.model_config
         )
 
     def test_simple_one_step_training(self):
