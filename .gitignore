@@ -184,3 +184,6 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
+
+proof_of_concept/results/
+proof_of_concept/tests/results/
