@@ -88,7 +88,7 @@ class STAGEDProcessor:
         Returns:
             Processed graph data in PyG format
         """
-        print(cell_idx, time_point,gene_expression.shape, cell_positions.shape)
+        # print(cell_idx, time_point,gene_expression.shape, cell_positions.shape)
         # Validate cell index
         if cell_idx >= gene_expression.shape[1] or cell_idx < 0:
             raise ValueError(f"Invalid cell_idx {cell_idx}. Must be between 0 and {gene_expression.shape[1]-1}")

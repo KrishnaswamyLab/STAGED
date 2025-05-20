@@ -349,17 +349,16 @@ def retrieve_simulated_data(data_dir="data/raw"):
     # - 'metadata' contains time_points, cell_ids, gene_names, cell_types, and prior_grns
     
     # Extract gene expression data (time_points x cells x genes)
-    data['gene_expression'] = torch.tensor(sim_data['genes'])
-    
+    data['gene_expression'] = torch.tensor(sim_data['genes'],dtype=torch.float32)
     # Extract cell positions (time_points x cells x 2)
     data['cell_positions'] = torch.tensor(sim_data['positions'])
-    
+
     # Extract metadata
     metadata = sim_data['metadata']
     
     # Extract gene names
     data['genes'] = metadata['gene_names']
-    
+
     # Extract cell type assignments
     cell_ids = metadata['cell_ids']
     cell_types_dict = metadata['cell_types']
@@ -367,7 +366,6 @@ def retrieve_simulated_data(data_dir="data/raw"):
     # Create a mapping from cell IDs to their corresponding types
     unique_cell_types = sorted(set(cell_types_dict.values()))
     label_to_int = {label: idx for idx, label in enumerate(unique_cell_types)}
-    print(label_to_int)
     # Map each cell ID to its corresponding integer label
     assignments = [label_to_int[cell_types_dict[cell_id]] for cell_id in cell_ids]
 
@@ -385,6 +383,7 @@ def retrieve_simulated_data(data_dir="data/raw"):
     data['n_time_points'] = data['gene_expression'].shape[0]
     data['n_cells'] = data['gene_expression'].shape[1]
     data['n_genes'] = data['gene_expression'].shape[2]
+
 
     return data
 

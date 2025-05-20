@@ -101,7 +101,6 @@ class TestTraining(unittest.TestCase):
         # Get genes and pairs from simple data
         n_genes = self.simple_data['gene_expression'].shape[-1]
         genes = [f"gene_{i}" for i in range(n_genes)]
-        
         # Create simple L-R pairs (first half are ligands, second half are receptors)
         mid = n_genes // 2
         ligand_receptor_pairs = [
@@ -178,8 +177,6 @@ class TestTraining(unittest.TestCase):
 
     def test_simulated_one_step_training(self):
         """Test training with simulated grid data in one-step mode."""
-        print("\nTesting one-step training with simulated data...")
-        
         # Train model using simulated data
         output = train_staged_model(
             data=self.simulated_data,
