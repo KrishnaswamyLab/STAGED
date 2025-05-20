@@ -25,6 +25,7 @@ dependencies:
   - ipykernel
   - ipywidgets
   - pyg
+  - tqdm
 
   # --------- loggers --------- #
   # - wandb
