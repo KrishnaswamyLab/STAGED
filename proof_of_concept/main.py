@@ -146,7 +146,7 @@ def main():
         receptor_gene_pairs=simulated_data['receptor_gene_pairs'],
         cell_type_assignments=simulated_data['cell_type_assignments'],
         prior_grns=simulated_data['prior_grns'],
-        prediction_mode="full",
+        prediction_mode="one_step",
         config=config
     )
     
