@@ -64,7 +64,6 @@ def retrieve_simulated_data(data_dir="data/raw"):
     data['prior_grns'] = cell_specific_prior_grns
 
     data['receptor_gene_pairs'] = metadata['receptor_gene_pairs']
-    data['ligand_gene_pairs'] = metadata['ligand_gene_pairs']
     data['ligand_receptor_pairs'] = metadata['ligand_receptor_pairs']
 
      # Calculate dimensions

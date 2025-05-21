@@ -68,7 +68,7 @@ def parse_args():
     
     # Training parametersmax_iterations
 
-    parser.add_argument('--max_iterations', type=int, default=1000,
+    parser.add_argument('--max_iterations', type=int, default=10,
                        help='Maximum number of training iterations')
     parser.add_argument('--num_epochs', type=int, default=5,
                        help='Number of epochs to train for')

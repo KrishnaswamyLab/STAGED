@@ -196,6 +196,9 @@ class TestTraining(unittest.TestCase):
         self.assertLess(output.loss_history[-1], output.loss_history[0])
         print(f"Initial loss: {output.loss_history[0]:.6f}")
         print(f"Final loss: {output.loss_history[-1]:.6f}")
+
+
+        
     def test_k_step_validation(self):
         """Test that k-step mode properly validates parameters."""
         print("\nTesting k-step parameter validation...")
