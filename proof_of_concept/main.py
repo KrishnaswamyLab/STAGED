@@ -29,6 +29,7 @@ from utils.visualization import (
 from utils.graph_constructor import GraphConstructor
 from utils.simulated_data_processing import retrieve_simulated_data
 from models.training import train_staged_model, TrainingConfig, ModelConfig
+import pickle
 
 def parse_args():
     parser = argparse.ArgumentParser(description='STAGED: Spatiotemporal Analysis of Gene Expression Dynamics')
@@ -67,7 +68,7 @@ def parse_args():
     
     # Training parametersmax_iterations
 
-    parser.add_argument('--max_iterations', type=int, default=10,
+    parser.add_argument('--max_iterations', type=int, default=1000,
                        help='Maximum number of training iterations')
     parser.add_argument('--num_epochs', type=int, default=5,
                        help='Number of epochs to train for')
@@ -136,6 +137,7 @@ def main():
         learning_rate=args.learning_rate,
         batch_size=args.batch_size,
         device=args.device,
+        output_model_path=os.path.join(args.output_dir, "model.pt"),
         model_config=model_config
     )
 
@@ -154,6 +156,18 @@ def main():
     # Check that loss decreased
     print(f"Initial loss: {results.loss_history[0]:.6f}")
     print(f"Final loss: {results.loss_history[-1]:.6f}")
+    
+    # Save results object to output directory
+    results_path = os.path.join(args.output_dir, "results.pkl")
+    with open(results_path, "wb") as f:
+        pickle.dump(results, f)
+    print(f"Results saved to {results_path}")
+
+    # Save config for future model loading
+    config_path = os.path.join(args.output_dir, "config.pkl")
+    with open(config_path, "wb") as f:
+        pickle.dump(config.__dict__, f)
+    print(f"Config saved to {config_path}")
     
     # # Visualize results if requested
     # if args.visualize:
