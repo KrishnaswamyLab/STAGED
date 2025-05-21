@@ -75,6 +75,9 @@ class GraphConstructor:
             if gene in self.receptor_targets:
                 for target_gene in self.receptor_targets[gene]:
                     base_grn.add_edge(receptor_node, target_gene)
+            
+            # connect receptor gene to its protein node
+            base_grn.add_edge(gene, receptor_node)
                 
         # Add ligand output nodes for ligand genes
         for gene in self.ligand_genes:
