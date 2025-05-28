@@ -120,7 +120,7 @@ def main():
     
 
     ##TODO: We should change this to pass the paths as parameters, not the preprocessing pipeline
-    simulated_data = retrieve_simulated_data()
+    simulated_data = retrieve_simulated_data(data_dir="data/raw",sim_file="100_simulation_results.pkl")
     
 
     # Model configuration

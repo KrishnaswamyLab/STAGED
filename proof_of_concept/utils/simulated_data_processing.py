@@ -3,7 +3,7 @@ import pickle
 import torch
 
 
-def retrieve_simulated_data(data_dir="data/raw"):
+def retrieve_simulated_data(data_dir="data/raw",sim_file="simulation_results.pkl"):
     """
     Load simulated data from the specified directory.
     
@@ -23,12 +23,10 @@ def retrieve_simulated_data(data_dir="data/raw"):
     # Verify the directory exists
     if not os.path.exists(data_dir):
         raise FileNotFoundError(f"Data directory not found: {data_dir}")
-    
-    # Define the main simulation results file path
-    sim_file_path = os.path.join(data_dir, "simulation_results.pkl")
+
 
     # Load the simulation results
-    with open(sim_file_path, 'rb') as f:
+    with open(os.path.join(data_dir,sim_file), 'rb') as f:
         sim_data = pickle.load(f)
     # Extract data from the loaded simulation results
     # Based on the saving function structure:
