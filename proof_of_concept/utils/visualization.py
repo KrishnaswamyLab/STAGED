@@ -4,6 +4,10 @@ import networkx as nx
 from matplotlib.animation import FuncAnimation
 import seaborn as sns
 import os
+import json
+import torch
+from typing import Dict, Optional
+from datetime import datetime
 
 def visualize_graph(graph, title, output_dir='results', save_plot=False, show_plot=True, figsize=(10, 10), return_pos=False):
     """
@@ -473,4 +477,85 @@ def plot_gene_correlations(gene_expression_data, cell_ids, gene_indices, time_po
     plt.tight_layout()
     
     plt.savefig(f"gene_correlations_t{time_point}.png")
-    plt.close() 
+    plt.close()
+
+
+def plot_training_results(output, save_path: Optional[str] = None):
+    """Plot training loss over iterations."""
+    plt.figure(figsize=(10, 6))
+    
+    plt.subplot(1, 2, 1)
+    plt.plot(output.loss_history)
+    plt.xlabel('Iteration')
+    plt.ylabel('Loss')
+    plt.title('Training Loss')
+    plt.grid(True)
+    
+    plt.subplot(1, 2, 2)
+    plt.semilogy(output.loss_history)
+    plt.xlabel('Iteration')
+    plt.ylabel('Loss (log scale)')
+    plt.title('Training Loss (Log Scale)')
+    plt.grid(True)
+    
+    plt.tight_layout()
+    
+    if save_path:
+        plt.savefig(save_path, dpi=150, bbox_inches='tight')
+        print(f"Training plot saved to: {save_path}")
+    else:
+        plt.show()
+
+
+def save_results(output, args, data_info: Dict, save_dir: str):
+    """Save training results and configuration."""
+    os.makedirs(save_dir, exist_ok=True)
+    
+    # Save configuration and results
+    results = {
+        'timestamp': datetime.now().isoformat(),
+        'args': vars(args),
+        'data_info': {
+            'type': args.data,
+            'shape': list(data_info.get('gene_expression', torch.empty(0)).shape),
+            'n_genes': data_info.get('n_genes', 0),
+            'n_cells': data_info.get('n_cells', 0),
+            'n_time_points': data_info.get('n_time_points', 0)
+        },
+        'training_results': {
+            'loss_history': output.loss_history,
+            'initial_loss': output.loss_history[0] if output.loss_history else None,
+            'final_loss': output.loss_history[-1] if output.loss_history else None,
+            'loss_reduction_percent': (
+                (output.loss_history[0] - output.loss_history[-1]) / output.loss_history[0] * 100
+                if output.loss_history and len(output.loss_history) > 1 else 0
+            )
+        }
+    }
+    
+    # Save to JSON
+    results_path = os.path.join(save_dir, 'training_results.json')
+    with open(results_path, 'w') as f:
+        json.dump(results, f, indent=2)
+    print(f"Results saved to: {results_path}")
+    
+    # Save model if available
+    if hasattr(output, 'model') and output.model is not None:
+        model_path = os.path.join(save_dir, 'model.pth')
+        torch.save(output.model.state_dict(), model_path)
+        print(f"Model saved to: {model_path}")
+    
+    # Save plot
+    plot_path = os.path.join(save_dir, 'training_plot.png')
+    plot_training_results(output, plot_path)
+
+
+def print_training_summary(output, args):
+    """Print a summary of training results."""
+    print(f"\nTraining Results:")
+    print(f"  Initial loss: {output.loss_history[0]:.6f}")
+    print(f"  Final loss: {output.loss_history[-1]:.6f}")
+    
+    if len(output.loss_history) > 1:
+        loss_reduction = (output.loss_history[0] - output.loss_history[-1]) / output.loss_history[0] * 100
+        print(f"  Loss reduction: {loss_reduction:.2f}%") 
