@@ -4,7 +4,6 @@ channels:
   - pyg
   - bioconda
   - defaults
-  - pyg
 
 dependencies:
   - python=3.10
@@ -25,13 +24,14 @@ dependencies:
   - ipykernel
   - ipywidgets
   - pyg
+  - tqdm
 
   # --------- loggers --------- #
   # - wandb
-
   - pip>=23
   - pip:
       - hydra-optuna-sweeper
       - hydra-colorlog
       - rootutils
+      - torch_geometric
       # - phate

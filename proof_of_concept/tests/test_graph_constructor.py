@@ -5,12 +5,14 @@ import torch
 import networkx as nx
 import numpy as np
 import matplotlib.pyplot as plt
+import pickle
 
 # Add the parent directory to the path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from utils.graph_constructor import GraphConstructor
 from utils.interpolation import HistoryInterpolator
+from utils.simulated_data_processing import retrieve_simulated_data
 
 class TestGraphConstructor(unittest.TestCase):
 
@@ -313,8 +315,6 @@ def create_hex_grid_test_data():
 
 # create_test_data = create_square_grid_data
 create_test_data = create_hex_grid_test_data
-
-
 
 def visualize_graph(graph, title, output_dir='results', save_plot=True, show_plot=False, figsize=(10, 10), return_pos=False):
     """
@@ -1086,8 +1086,9 @@ def test_assign_node_features_ode():
 
 if __name__ == "__main__":
     # Create test data
-    data = create_test_data()
+    # data = create_test_data()
     
+    data = retrieve_simulated_data()
     # Only print a subset of the time points to keep output readable
     print_subset_time_points = [0, 3, 5, 7, 10, 14]  # Selected time points to print
     

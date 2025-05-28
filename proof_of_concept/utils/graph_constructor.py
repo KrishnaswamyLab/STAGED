@@ -31,7 +31,7 @@ class GraphConstructor:
         # Identify receptor and ligand genes
         self.receptor_genes = set(receptor for _, receptor in ligand_receptor_pairs)
         self.ligand_genes = set(ligand for ligand, _ in ligand_receptor_pairs)
-        
+
         # Create a mapping of which genes each receptor connects to
         self.receptor_targets = {}
         for receptor, target_gene in receptor_gene_pairs:

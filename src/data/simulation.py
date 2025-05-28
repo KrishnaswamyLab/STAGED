@@ -11,7 +11,7 @@ sys.path.append('/gpfs/gibbs/pi/krishnaswamy_smita/kx44/projects/STAGED')
 from src.data.cell import CellNetwork
 
 class CellSimulation:
-    def __init__(self, num_cells=4, nodes_per_cell=5, delta1 = 1, delta2=2, delta3=3):
+    def __init__(self, num_cells=4, nodes_per_cell=5, delta1 = 1, delta2=2, delta3=3, deltal = 5):
         """
         Simulation of cellular gene regulation network with explicit time stepping
         
@@ -27,6 +27,8 @@ class CellSimulation:
             Time delay for receptor to gene signaling
         delta3 : int
             Time delay for ligand to receptor expression
+        deltal: int
+            Time delay for receptor recieving ligand signal
         """
         self.network = CellNetwork(num_cells, nodes_per_cell)
         self.data = self.network.create_graph()
@@ -46,6 +48,7 @@ class CellSimulation:
         self.delta1 = delta1  # Delay between genes
         self.delta2 = delta2  # Delay from receptor to gene
         self.delta3 = delta3  # Delay from ligand to receptor
+        self.deltal = deltal  # Delay from receptor to ligand
         
         # Initialize cell update functions
         self.cell_updaters = [self.default_gene_updater for _ in range(num_cells)]
@@ -140,8 +143,18 @@ class CellSimulation:
             
             l_vals = torch.stack(l_vals).view(-1, 1)
             
-            # Calculate receptor inputs using spatial decay
-            r_inputs = self.spatial_decay(l_vals, self.network.distances)
+            # Calculate receptor inputs using spatial decay, add time lag deltal
+            if t - self.deltal >= 0:
+                past_l_vals = []
+                for c in range(self.num_cells):
+                    base = c * self.nodes_per_cell
+                    l_idx = base + self.L
+                    past_l_vals.append(history[t - self.deltal][l_idx])
+                    
+                past_l_vals = torch.stack(past_l_vals).view(-1, 1)
+                r_inputs = self.spatial_decay(past_l_vals, self.network.distances)
+            else:
+                r_inputs = torch.zeros(self.num_cells, 1)
             
             # Update each node in the network
             for c in range(self.num_cells):
@@ -509,10 +522,84 @@ class CellSimulation:
         plt.tight_layout()
         return fig, ax
     
-    def save_simulation_results():
-        #TODO save all data in the format:
-        # (time, num_cells, 2) = spatial_data.shape 
-        # (time, num_cells, genes) = raw_data.shape 
-        # (num_cell_types, graph_priors) = prior_graphs_data.shape
-        # (num_cells,1) or (num_cells,num_cell_types)  = cell_types.shape # cell types label for each cell on the dataset
-        return
+    # def save_simulation_results():
+    #     #TODO save all data in the format:
+    #     # (time, num_cells, 2) = spatial_data.shape 
+    #     # (time, num_cells, genes) = raw_data.shape 
+    #     # (num_cell_types, graph_priors) = prior_graphs_data.shape
+    #     # (num_cells,1) or (num_cells,num_cell_types)  = cell_types.shape # cell types label for each cell on the dataset
+    #     return
+    
+    def save_simulation_results(self, history=None, steps=100, output_dir="./simulation_data", 
+                                cell_types=None, num_cell_types=1):
+        """
+        Save simulation results in standard format for later use
+        
+        Parameters:
+        -----------
+        history : torch.Tensor or None
+            History of expression values [steps, nodes, 1]
+        steps : int
+            Number of steps to simulate if history is None
+        output_dir : str
+            Directory to save the output files
+        cell_types : torch.Tensor or None
+            Cell type assignments. If None, all cells are assigned to type 0
+        num_cell_types : int
+            Number of cell types in the simulation
+        """
+        # Run simulation if history not provided
+        if history is None:
+            history = self.run_simulation(steps=steps)
+        
+        # Create output directory if it doesn't exist
+        os.makedirs(output_dir, exist_ok=True)
+        
+        # 1. Prepare spatial data: (time, num_cells, 2)
+        # Use cell coordinates from the network, repeated for each time step
+        spatial_data = torch.zeros(len(history), self.num_cells, 2)
+        for t in range(len(history)):
+            spatial_data[t] = self.network.cell_coords
+        
+        # 2. Prepare raw data: (time, num_cells, nodes_per_cell)
+        # Include all node types (genes, ligand, receptor)
+        raw_data = torch.zeros(len(history), self.num_cells, self.nodes_per_cell)
+        
+        for t in range(len(history)):
+            for c in range(self.num_cells):
+                for n_idx in range(self.nodes_per_cell):
+                    node_idx = c * self.nodes_per_cell + n_idx
+                    raw_data[t, c, n_idx] = history[t, node_idx, 0]
+        
+        # 3. Prepare prior graphs: (num_cell_types, num_nodes, num_nodes)
+        # Create an adjacency matrix for each cell type
+        edge_index = self.data.edge_index
+        total_nodes = self.num_cells * self.nodes_per_cell
+        
+        # Create adjacency matrix from edge_index
+        adj_matrix = torch.zeros(total_nodes, total_nodes)
+        for i in range(edge_index.shape[1]):
+            src, dst = edge_index[0, i], edge_index[1, i]
+            adj_matrix[src, dst] = 1.0
+        
+        # Stack the same graph for each cell type (in a real scenario, might have different graphs)
+        prior_graphs = torch.stack([adj_matrix for _ in range(num_cell_types)])
+        
+        # 4. Prepare cell types: (num_cells, 1) or (num_cells, num_cell_types)
+        if cell_types is None:
+            # Default: all cells are type 0
+            cell_types = torch.zeros(self.num_cells, 1, dtype=torch.long)
+        
+        # Save the data
+        torch.save(spatial_data, os.path.join(output_dir, "spatial_data.pt"))
+        torch.save(raw_data, os.path.join(output_dir, "raw_data.pt"))
+        torch.save(prior_graphs, os.path.join(output_dir, "prior_graphs.pt"))
+        torch.save(cell_types, os.path.join(output_dir, "cell_types.pt"))
+        
+        print(f"Simulation data saved to {output_dir}:")
+        print(f"- Spatial data: {spatial_data.shape}")
+        print(f"- Raw data: {raw_data.shape}")
+        print(f"- Prior graphs: {prior_graphs.shape}")
+        print(f"- Cell types: {cell_types.shape}")
+        
+        return spatial_data, raw_data, prior_graphs, cell_types

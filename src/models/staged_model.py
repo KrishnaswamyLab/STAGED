@@ -1,90 +1,110 @@
-from typing import Any, Dict, Tuple
-
 import torch
 import torch.nn as nn
-import torch.optim as optim
-from lightning import LightningModule
-from torchmetrics import MaxMetric, MeanMetric
-from torchmetrics.classification.accuracy import Accuracy
+import torch.nn.functional as F
+from torch_geometric.nn import GATConv
+from torch_geometric.data import Data, Batch
 
-# PyTorch geometric
-import torch_geometric.nn as geom_nn
 
-from src.models.components.gnn_model import GNNModel
-
-class STAGEDModel(LightningModule):
-    def __init__(self, **model_kwargs):
-        super().__init__()
-        # Saving hyperparameters
-        self.save_hyperparameters()
-
-        print(model_kwargs)
+class STAGED(nn.Module):
+    """
+    STAGED (Spatiotemporal Analysis of Gene Expression Dynamics) model
+    Implements a graph-based model for predicting gene expression trajectories
+    with spatial and temporal context.
+    """
+    def __init__(
+        self,
+        num_genes,
+        hidden_dim=64,
+        num_gat_layers=1,
+        num_mlp_layers=2,
+        dropout=0.1,
+        delta_gl=1,  # Time lag for gene -> ligand
+        delta_lr=5,  # Time lag for ligand -> receptor 
+        delta_rg=3,  # Time lag for receptor -> gene
+        delta_gg=7,  # Time lag for gene -> gene
+        add_self_loops=True,
+    ):
+        super(STAGED, self).__init__()
         
-        self.model = GraphGNNModel(**model_kwargs)
-        self.loss_module = nn.BCEWithLogitsLoss() if self.hparams.c_out == 1 else nn.CrossEntropyLoss()
-
-    def forward(self, data, mode="train"):
-        x, edge_index, batch_idx = data.x, data.edge_index, data.batch
-        x = self.model(x, edge_index, batch_idx)
-        x = x.squeeze(dim=-1)
-
-        if self.hparams.c_out == 1:
-            preds = (x > 0).float()
-            data.y = data.y.float()
-        else:
-            preds = x.argmax(dim=-1)
-        loss = self.loss_module(x, data.y)
-        acc = (preds == data.y).sum().float() / preds.shape[0]
-        return loss, acc
-
-    def configure_optimizers(self):
-        # High lr because of small dataset and small model
-        optimizer = optim.AdamW(self.parameters(), lr=1e-2, weight_decay=0.0)
-        return optimizer
-
-    def training_step(self, batch, batch_idx):
-        loss, acc = self.forward(batch, mode="train")
-        self.log("train_loss", loss)
-        self.log("train_acc", acc)
-        return loss
-
-    def validation_step(self, batch, batch_idx):
-        _, acc = self.forward(batch, mode="val")
-        self.log("val_acc", acc)
-
-    def test_step(self, batch, batch_idx):
-        _, acc = self.forward(batch, mode="test")
-        self.log("test_acc", acc)
-
-class GraphGNNModel(nn.Module):
-    def __init__(self, c_in, c_hidden, c_out, dp_rate_linear=0.5, **kwargs):
-        """GraphGNNModel.
-
-        Args:
-            c_in: Dimension of input features
-            c_hidden: Dimension of hidden features
-            c_out: Dimension of output features (usually number of classes)
-            dp_rate_linear: Dropout rate before the linear layer (usually much higher than inside the GNN)
-            kwargs: Additional arguments for the GNNModel object
-
+        self.num_genes = num_genes
+        self.hidden_dim = hidden_dim
+        self.delta_gl = delta_gl
+        self.delta_lr = delta_lr
+        self.delta_rg = delta_rg
+        self.delta_gg = delta_gg
+        self.add_self_loops = add_self_loops
+        
+        # Initial feature dimensions
+        self.input_dim = 1  # Single gene expression value
+        
+        # GAT layers
+        assert num_gat_layers == 1, "Must have exactly one GAT layer"
+        self.gat_layers = nn.ModuleList()
+        self.gat_layers.append(GATConv(self.input_dim, hidden_dim, heads=1, dropout=dropout, add_self_loops=add_self_loops)) # optionally use GATv2Conv? TODO investigate difference.
+        
+        for _ in range(num_gat_layers - 1):
+            self.gat_layers.append(GATConv(hidden_dim, hidden_dim, heads=1, dropout=dropout, add_self_loops=add_self_loops))
+        
+        # MLP for prediction using Sequential
+        mlp_layers = []
+        mlp_layers.append(nn.Linear(hidden_dim, hidden_dim))
+        mlp_layers.append(nn.ReLU())
+        mlp_layers.append(nn.Dropout(dropout))
+        
+        for _ in range(num_mlp_layers - 2):
+            mlp_layers.append(nn.Linear(hidden_dim, hidden_dim))
+            mlp_layers.append(nn.ReLU())
+            mlp_layers.append(nn.Dropout(dropout))
+        
+        mlp_layers.append(nn.Linear(hidden_dim, 1))
+        self.mlp = nn.Sequential(*mlp_layers)
+    
+    def forward(self, batch_data):
         """
-        super().__init__()
-        self.GNN = GNNModel(c_in=c_in, c_hidden=c_hidden, c_out=c_hidden, **kwargs)  # Not our prediction output yet!
-        self.head = nn.Sequential(nn.Dropout(dp_rate_linear), nn.Linear(c_hidden, c_out))
-
-    def forward(self, x, edge_index, batch_idx):
-        """Forward.
-
+        Forward pass of the STAGED model
+        
         Args:
-            x: Input features per node
-            edge_index: List of vertex index pairs representing the edges in the graph (PyTorch geometric notation)
-            batch_idx: Index of batch element for each node
-
+            batch_data: PyTorch Geometric Data or Batch object
+                Can be a single graph or a batch of graphs
+            
+        Returns:
+            node_embeddings: Node embeddings after GAT layers
+            attention_weights: Attention weights from the last GAT layer
         """
-        x = self.GNN(x, edge_index)
-        x = geom_nn.global_mean_pool(x, batch_idx)  # Average pooling
-        x = self.head(x)
-        return x
-
-if __name__ == "__main__":
-    _ = STAGEDModel(None, None, None, None)
+        x = batch_data.x
+        edge_index = batch_data.edge_index
+        
+        # Track attention weights from the last layer
+        attention = None
+        
+        # Apply GAT layers
+        for gat_layer in self.gat_layers:
+            # The GATConv automatically respects graph boundaries in batched data
+            x, attention = gat_layer(x, edge_index, return_attention_weights=True) # only returns the last layer's attention weights
+            x = F.relu(x)
+            x = F.dropout(x, p=0.1, training=self.training)
+        
+        return x, attention
+    
+    def predict_genes(self, node_embeddings, gene_indices):
+        """
+        Generate predictions for gene nodes
+        
+        Args:
+            node_embeddings: Embeddings for all nodes
+            gene_indices: Indices of the gene nodes to predict
+            
+        Returns:
+            predictions: Gene expression predictions [num_genes, 1]
+        """
+        # Get embeddings for gene nodes only
+        gene_embeddings = node_embeddings[gene_indices]
+        
+        # Apply MLP to get predictions
+        predictions = self.mlp(gene_embeddings)
+        
+        return predictions
+        
+    def get_t_init(self):
+        """Return the initial time steps needed before prediction can start"""
+        return max(self.delta_gl, self.delta_lr, self.delta_rg, self.delta_gg) 

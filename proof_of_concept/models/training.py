@@ -30,6 +30,7 @@ class TrainingConfig:
     distance_threshold: float = 10.0
     device: Optional[torch.device] = None
     model_config: Optional[ModelConfig] = None
+    output_model_path: str = "trained_model.pth"
 
 @dataclass
 class TrainingOutput:
@@ -219,6 +220,7 @@ def train_staged_model(
         loss_history.append(loss.item())
         pbar.set_postfix({'loss': f'{loss.item():.6f}'})
     
+    torch.save(model.state_dict(), config.output_model_path)
     return TrainingOutput(
         loss_history=loss_history,
         model=model

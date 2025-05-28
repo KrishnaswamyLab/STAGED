@@ -13,7 +13,7 @@ parent_dir = os.path.dirname(current_dir)
 sys.path.insert(0, parent_dir)
 
 from models.training import train_staged_model, TrainingConfig, ModelConfig
-from test_graph_constructor import create_square_grid_data
+from test_graph_constructor import create_square_grid_data, retrieve_simulated_data
 
 # NOTE: This file tests next-step prediction training.
 # For Neural ODE training tests, see test_training_ode.py
@@ -67,11 +67,19 @@ class TestTraining(unittest.TestCase):
         # Create more complex test data using existing function
         cls.complex_data = create_square_grid_data()
         
+        # Retrieve data from simulated data
+        cls.simulated_data = retrieve_simulated_data()
+
         # Convert complex data tensors to proper device
         for key, value in cls.complex_data.items():
             if isinstance(value, torch.Tensor):
                 cls.complex_data[key] = value.to(cls.device)
         
+        #Do the same conversion for simulated data
+        for key, value in cls.simulated_data.items():
+            if isinstance(value, torch.Tensor):
+                cls.simulated_data[key] = value.to(cls.device)
+
         # Model configuration
         cls.model_config = ModelConfig(
             hidden_dim=32,  # Smaller for testing
@@ -96,7 +104,6 @@ class TestTraining(unittest.TestCase):
         # Get genes and pairs from simple data
         n_genes = self.simple_data['gene_expression'].shape[-1]
         genes = [f"gene_{i}" for i in range(n_genes)]
-        
         # Create simple L-R pairs (first half are ligands, second half are receptors)
         mid = n_genes // 2
         ligand_receptor_pairs = [
@@ -171,6 +178,30 @@ class TestTraining(unittest.TestCase):
         print(f"Initial loss: {output.loss_history[0]:.6f}")
         print(f"Final loss: {output.loss_history[-1]:.6f}")
 
+    def test_simulated_one_step_training(self):
+        """Test training with simulated grid data in one-step mode."""
+        # Train model using simulated data
+        output = train_staged_model(
+            data=self.simulated_data,
+            genes=self.simulated_data['genes'],
+            ligand_receptor_pairs=self.simulated_data['ligand_receptor_pairs'],
+            receptor_gene_pairs=self.simulated_data['receptor_gene_pairs'],
+            cell_type_assignments=self.simulated_data['cell_type_assignments'],
+            prior_grns=self.simulated_data['prior_grns'],
+            prediction_mode="one_step",
+            config=self.config
+        )
+        
+        # Check that training produced loss history
+        self.assertEqual(len(output.loss_history), self.config.max_iterations)
+        
+        # Check that loss decreased
+        self.assertLess(output.loss_history[-1], output.loss_history[0])
+        print(f"Initial loss: {output.loss_history[0]:.6f}")
+        print(f"Final loss: {output.loss_history[-1]:.6f}")
+
+
+        
     def test_k_step_validation(self):
         """Test that k-step mode properly validates parameters."""
         print("\nTesting k-step parameter validation...")
