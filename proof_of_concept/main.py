@@ -145,7 +145,6 @@ def print_configuration(args, eval_times=None):
     print(f"  Hidden dim: {args.hidden_dim}")
     print(f"  Delta parameters: GL={args.delta_gl}, LR={args.delta_lr}, RG={args.delta_rg}, GG={args.delta_gg}")
     
-<<<<<<< HEAD
     if args.mode == 'k_step':
         print(f"  K steps: {args.k_steps}")
     elif args.mode == 'ode' and eval_times is not None:
@@ -196,7 +195,6 @@ def prepare_mode_kwargs(args, device):
         eval_times = parse_eval_times(args.eval_times, device)
         mode_kwargs['ode_eval_times'] = eval_times
         mode_kwargs['ode_method'] = args.ode_method
-=======
     # Load data
     print("Loading data...")
     
@@ -445,7 +443,6 @@ def prepare_mode_kwargs(args, device):
     #         os.chdir('..')  # Return to output directory
         
     #     print(f"Visualizations saved to {args.output_dir}")
->>>>>>> main
     
     return mode_kwargs, eval_times
 
