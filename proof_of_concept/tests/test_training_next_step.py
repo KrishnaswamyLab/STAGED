@@ -15,6 +15,9 @@ sys.path.insert(0, parent_dir)
 from models.training import train_staged_model, TrainingConfig, ModelConfig
 from test_graph_constructor import create_square_grid_data, retrieve_simulated_data
 
+# NOTE: This file tests next-step prediction training.
+# For Neural ODE training tests, see test_training_ode.py
+
 def create_simple_test_data(
     n_time_points: int = 15,
     n_cells: int = 4,

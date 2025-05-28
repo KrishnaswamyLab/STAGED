@@ -1,121 +1,238 @@
 # STAGED: Spatiotemporal Analysis of Gene Expression Dynamics
 
-This is a proof-of-concept implementation of the STAGED algorithm for predicting gene expression trajectories using spatial information and gene regulatory networks (GRNs).
+A proof-of-concept implementation of the STAGED algorithm for predicting gene expression trajectories using spatial information and gene regulatory networks (GRNs), with Neural ODE integration.
 
-## Overview
+## Features
 
-STAGED implements a graph-based approach to model gene expression dynamics in spatial contexts, taking into account:
+- **Multiple Prediction Modes**: Traditional next-step, k-step ahead, and Neural ODE prediction
+- **Modular Data Generation**: Factory pattern for different synthetic data types
+- **Clean Training Interface**: Command-line interface with comprehensive parameter control
+- **Visualization Suite**: Automatic plotting and result saving
 
-1. Cell-type-specific gene regulatory networks (GRNs)
-2. Ligand-receptor interactions between cells
-3. Spatial proximity of cells
-4. Temporal dynamics with appropriate time lags
+## Quick Start
 
-The model uses Graph Attention Networks (GAT) to learn the influence of genes on each other and predict future gene expression values.
+```bash
+# Neural ODE training with oscillatory data
+python main.py --mode ode --data oscillatory --iterations 50
+
+# Next-step prediction with hex grid data  
+python main.py --mode one_step --data hex_grid --iterations 100
+
+# K-step prediction with sinusoidal data
+python main.py --mode k_step --data sinusoidal --k_steps 3 --iterations 75
+```
 
 ## Project Structure
 
 ```
 proof_of_concept/
+├── main.py                    # Main training interface
 ├── models/
-│   └── staged.py         # Main STAGED model implementation
+│   ├── staged.py             # Core STAGED model
+│   ├── training.py           # Training logic and configurations
+│   └── inference_processor.py # Inference and Neural ODE integration
 ├── utils/
-│   ├── data_utils.py     # Utilities for data loading and preprocessing
-│   ├── graph_constructor.py  # Utilities for constructing cell-specific graphs
-│   └── visualization.py  # Utilities for visualizing results
-├── main.py               # Main script to run the model
-├── trainer.py            # Training procedures
-└── README.md             # This file
+│   ├── data_factory.py       # Data generation for different types
+│   ├── visualization.py      # Plotting and result saving
+│   └── graph_constructor.py  # Graph construction utilities
+├── tests/                    # Comprehensive test suite
+│   ├── test_training_ode.py  # Neural ODE training tests
+│   ├── test_training_next_step.py # Traditional training tests
+│   └── temporal_data_generator.py # Test data generators
+└── requirements.txt          # Dependencies
+```
+
+## Neural ODE Integration
+
+STAGED now supports Neural ODE prediction where the model learns derivatives that are integrated over time using `torchdiffeq.odeint`:
+
+- **Continuous predictions**: Evaluate at any time points
+- **Interpolated history**: Access lagged values at non-discrete times
+- **Multiple ODE methods**: Euler, RK4, DoPri5, Adams
+
+## Available Data Types
+
+1. **`oscillatory`** - Realistic gene expression with regulatory interactions
+2. **`damped_oscillator`** - Physics-based harmonic oscillators for ODE testing  
+3. **`sinusoidal`** - Simple sinusoidal patterns for quick testing
+4. **`hex_grid`** - Hexagonal spatial arrangement test data
+5. **`square_grid`** - Square grid spatial arrangement test data
+
+## Training Modes
+
+### 1. Neural ODE (`--mode ode`)
+```bash
+python main.py --mode ode --data oscillatory --eval_times "0.0,0.5,1.0,1.5"
+```
+
+### 2. Next-Step (`--mode one_step`)
+```bash
+python main.py --mode one_step --data hex_grid --iterations 100
+```
+
+### 3. K-Step (`--mode k_step`)
+```bash
+python main.py --mode k_step --data sinusoidal --k_steps 5
 ```
 
 ## Requirements
 
-- Python 3.7+
-- PyTorch 1.8+
-- PyTorch Geometric
-- NetworkX
-- NumPy
-- Matplotlib
-- Seaborn
-- scikit-learn
-
-## Usage
-
-To run the model with default parameters and synthetic data:
+Install dependencies:
 
 ```bash
-python main.py --visualize
+pip install -r requirements.txt
 ```
 
-### Command-line Arguments
+Key requirements:
+- PyTorch 1.8+
+- PyTorch Geometric
+- torchdiffeq (for Neural ODE)
+- NetworkX
+- NumPy, Matplotlib
 
-```
---expression_data: Path to gene expression data file
---positions_data: Path to cell position data file
---lr_pairs_data: Path to ligand-receptor pairs data file
---cell_types_data: Path to cell type assignments data file
---prior_grns_data: Path to prior GRNs data file
---hidden_dim: Hidden dimension for the model (default: 64)
---num_gat_layers: Number of GAT layers (default: 2)
---num_mlp_layers: Number of MLP layers (default: 2)
---delta_gl: Time lag for gene -> ligand (default: 1)
---delta_lr: Time lag for ligand -> receptor (default: 1)
---delta_rg: Time lag for receptor -> gene (default: 1)
---delta_gg: Time lag for gene -> gene (default: 1)
---num_epochs: Number of epochs to train for (default: 50)
---batch_size: Batch size (default: 16)
---learning_rate: Learning rate (default: 0.001)
---weight_decay: Weight decay (default: 1e-5)
---patience: Patience for early stopping (default: 10)
---validation_split: Fraction of data to use for validation (default: 0.1)
---distance_threshold: Maximum distance to consider cells as neighbors (default: 10.0)
---visualize: Visualize results
---output_dir: Output directory for results and visualizations (default: 'results')
---device: Device to run the model on (default: 'cuda' if available, else 'cpu')
+## Testing
+
+Run the test suite:
+
+```bash
+# Test Neural ODE functionality
+python -m pytest tests/test_training_ode.py -v
+
+# Test traditional training
+python -m pytest tests/test_training_next_step.py -v
+
+# Run all tests
+python -m pytest tests/ -v
 ```
 
-## Model Components
+---
 
-### STAGED Model (models/staged.py)
+# Training Interface Documentation
 
-The core model that implements the Graph Attention Network (GAT) to learn cell-specific gene interactions and predict gene expression.
+## Parameter Reference
 
-### Graph Constructor (utils/graph_constructor.py)
+### Required Parameters
+- `--mode`: Prediction mode (ode, one_step, k_step)
+- `--data`: Data type to use
 
-Utilities for constructing cell-specific graphs that incorporate:
-- Cell-type-specific GRNs
-- Receptor nodes for each receptor gene
-- Ligand nodes for ligand genes
-- Connections to neighboring cells based on spatial proximity
+### Training Parameters
+- `--iterations`: Number of training iterations (default: 50)
+- `--lr`: Learning rate (default: 0.01)
+- `--batch_size`: Batch size (default: 4)
 
-### Trainer (trainer.py)
+### Model Architecture
+- `--hidden_dim`: Hidden dimension size (default: 64)
+- `--gat_layers`: Number of GAT layers (default: 1)
+- `--mlp_layers`: Number of MLP layers (default: 3)
+- `--dropout`: Dropout rate (default: 0.1)
 
-The main training procedure that handles:
-- Data preprocessing
-- Graph construction for each cell and time point
-- Model training with appropriate time lags
-- Validation and prediction
+### Time Lag Parameters (Delta)
+- `--delta_gl`: Gene-ligand time lag (default: 1)
+- `--delta_lr`: Ligand-receptor time lag (default: 2)
+- `--delta_rg`: Receptor-gene time lag (default: 1)
+- `--delta_gg`: Gene-gene time lag (default: 0, automatically set to 0 for ODE mode)
 
-### Visualization Utilities (utils/visualization.py)
+### Mode-Specific Parameters
 
-Functions for visualizing:
-- Gene expression trajectories
-- Spatial distribution of gene expression
-- Graph structures with attention weights
-- Training loss curves
-- Gene correlations
+**For ODE mode:**
+- `--eval_times`: Comma-separated evaluation times (e.g., "0.0,0.5,1.0")
+- `--ode_method`: Integration method (euler, rk4, dopri5, adams)
 
-## Data Format
+**For K-step mode:**
+- `--k_steps`: Number of steps to predict ahead
 
-The model expects data in the following format:
+### Output Options
+- `--save_dir`: Directory to save results and plots (optional)
+- `--device`: Device to use (auto, cpu, cuda)
+- `--seed`: Random seed for reproducibility (default: 42)
 
-1. Gene expression data: Dictionary mapping cell IDs to gene expression trajectories
-2. Cell positions: Dictionary mapping cell IDs to spatial positions at each time point
-3. Ligand-receptor pairs: List of (ligand, receptor) gene pairs
-4. Cell type assignments: Dictionary mapping cell IDs to cell types
-5. Prior GRNs: Dictionary mapping cell types to prior GRNs
+## Complete Example
 
-For this proof-of-concept, synthetic data is generated if no input files are provided.
+```bash
+python main.py \
+  --mode ode \
+  --data oscillatory \
+  --iterations 100 \
+  --lr 0.005 \
+  --batch_size 8 \
+  --hidden_dim 128 \
+  --gat_layers 2 \
+  --mlp_layers 4 \
+  --dropout 0.15 \
+  --delta_gl 1 \
+  --delta_lr 2 \
+  --delta_rg 1 \
+  --eval_times "0.0,0.2,0.4,0.6,0.8,1.0" \
+  --ode_method dopri5 \
+  --save_dir results/my_experiment \
+  --device auto \
+  --seed 123
+```
+
+## Output
+
+### Console Output
+- Training configuration summary
+- Progress during training
+- Final results (initial loss, final loss, loss reduction)
+
+### Saved Results (if `--save_dir` specified)
+- `training_results.json`: Complete configuration and results
+- `model.pth`: Trained model state dict
+- `training_plot.png`: Loss curves (linear and log scale)
+
+## Example Workflows
+
+### Quick Testing
+```bash
+# Quick ODE test (10 iterations)
+python main.py --mode ode --data sinusoidal --iterations 10 --eval_times "0.0,1.0"
+
+# Quick next-step test
+python main.py --mode one_step --data hex_grid --iterations 10
+```
+
+### Mode Comparison
+```bash
+# Test same data with different modes
+python main.py --mode one_step --data oscillatory --iterations 50
+python main.py --mode ode --data oscillatory --iterations 50 --eval_times "0.0,0.4,0.8"
+python main.py --mode k_step --data oscillatory --iterations 50 --k_steps 3
+```
+
+### Production Training
+```bash
+# Full training with result saving
+python main.py \
+  --mode ode \
+  --data oscillatory \
+  --iterations 200 \
+  --lr 0.003 \
+  --hidden_dim 256 \
+  --gat_layers 2 \
+  --eval_times "0.0,0.1,0.2,0.3,0.4,0.5" \
+  --save_dir results/production_run
+```
+
+## Tips
+
+1. **For ODE mode**: Start with fewer evaluation times and simpler data
+2. **For debugging**: Use `--iterations 5` and `--data sinusoidal`
+3. **For production**: Increase `--hidden_dim`, `--gat_layers`, and `--iterations`
+4. **For reproducibility**: Always specify `--seed`
+5. **For GPU training**: Use `--device cuda` (if available)
+
+---
+
+## Model Architecture
+
+STAGED uses Graph Attention Networks (GAT) to model:
+- Cell-type-specific gene regulatory networks
+- Ligand-receptor interactions between cells  
+- Spatial proximity effects
+- Temporal dynamics with configurable time lags
+
+The Neural ODE extension allows continuous-time prediction by learning expression derivatives rather than discrete next-step values.
 
 ## Citation
 
@@ -132,4 +249,4 @@ If you use this code in your research, please cite:
 
 ## License
 
-This project is licensed under the MIT License - see the LICENSE file for details. 
+MIT License - see LICENSE file for details. 
