@@ -257,4 +257,90 @@ class GraphConstructor:
         pyg_graph.node_names = node_list  # Store the ordered list of node names
         pyg_graph.node_types = [graph.nodes[node].get('type', 'gene') for node in node_list]  # Store node types
         
+        return pyg_graph
+
+    def assign_node_features_ode(self, graph, cell_idx_in_dataset: int, current_ode_time_t: float,
+                                 current_y_for_cell: torch.Tensor, 
+                                 history_interpolator, 
+                                 delta_gl: int, delta_lr: int, delta_rg: int, delta_gg: int,
+                                 device: torch.device = torch.device('cpu')):
+        """
+        Assign features to nodes for Neural ODE mode.
+        - 'gene' nodes use current_y_for_cell (delta_gg is ignored)
+        - Other nodes use history_interpolator with their respective deltas
+        
+        Args:
+            graph: networkx graph for the cell
+            cell_idx_in_dataset: Original index of the cell in the dataset
+            current_ode_time_t: Current time t from ODE solver
+            current_y_for_cell: Current ODE state for this cell's genes (n_genes,)
+            history_interpolator: HistoryInterpolator instance
+            delta_gl, delta_lr, delta_rg, delta_gg: Time lags (delta_gg ignored for gene nodes)
+            device: torch device for output tensors
+            
+        Returns:
+            graph_data: PyTorch Geometric Data object with node features
+        """
+        if delta_gg != 0:
+            print(f"Warning: delta_gg={delta_gg} is specified but will be ignored for 'gene' nodes in ODE mode.")
+
+        node_features = {}
+        gene_node_indices = []
+        node_list = list(graph.nodes())
+
+        for i, node in enumerate(node_list):
+            node_type = graph.nodes[node].get('type', 'gene')
+            feature_val = 0.0
+
+            if node_type == 'gene':
+                gene_id = node
+                gene_idx = self.gene_indices[gene_id]
+                gene_node_indices.append(i)
+                # Use current ODE state for gene nodes
+                feature_val = current_y_for_cell[gene_idx].item()
+                
+            elif node_type == 'ligand':
+                gene = graph.nodes[node]['gene']
+                gene_idx = self.gene_indices[gene]
+                # Use interpolated history with gene-ligand lag
+                expr_time = current_ode_time_t - delta_gl
+                feature_val = history_interpolator.interpolate(expr_time, cell_idx_in_dataset, gene_idx)
+
+            elif node_type == 'input_ligand':
+                # Get neighbor cell index from the 'cell' attribute (set by update_graph_with_neighbors)
+                neighbor_cell_idx = graph.nodes[node]['cell']
+                gene = graph.nodes[node]['gene']
+                gene_idx = self.gene_indices[gene]
+                # Use interpolated history with ligand-receptor lag
+                expr_time = current_ode_time_t - delta_lr
+                feature_val = history_interpolator.interpolate(expr_time, neighbor_cell_idx, gene_idx)
+
+            elif node_type == 'receptor':
+                gene = graph.nodes[node]['gene']
+                gene_idx = self.gene_indices[gene]
+                # Use interpolated history with receptor-gene lag
+                expr_time = current_ode_time_t - delta_rg
+                feature_val = history_interpolator.interpolate(expr_time, cell_idx_in_dataset, gene_idx)
+
+            node_features[node] = [feature_val]
+
+        # Convert to tensors
+        features = torch.tensor([node_features[node] for node in node_list], dtype=torch.float, device=device)
+        
+        # Create edge indices
+        edge_list = []
+        for src, dst in graph.edges():
+            src_idx = node_list.index(src)
+            dst_idx = node_list.index(dst)
+            edge_list.append([src_idx, dst_idx])
+        
+        if edge_list:
+            edge_index = torch.tensor(edge_list, dtype=torch.long, device=device).t().contiguous()
+        else:
+            edge_index = torch.empty((2, 0), dtype=torch.long, device=device)
+
+        # Create PyG Data object
+        pyg_graph = Data(x=features, edge_index=edge_index)
+        pyg_graph.gene_node_indices = torch.tensor(gene_node_indices, dtype=torch.long, device=device)
+        
         return pyg_graph 

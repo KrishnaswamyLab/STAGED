@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from utils.graph_constructor import GraphConstructor
-
+from utils.interpolation import HistoryInterpolator
 
 class TestGraphConstructor(unittest.TestCase):
 
@@ -973,6 +973,117 @@ def visualize_all_cells_comparison(data, output_dir='results', save_plot=True, s
         plt.close()
 
 
+def test_assign_node_features_ode():
+    """Test feature assignment to nodes with ODE interpolation"""
+    # Create test data using existing function
+    data = create_hex_grid_test_data()  # or create_square_grid_data()
+    
+    # Initialize the GraphConstructor
+    graph_constructor = GraphConstructor(
+        genes=data['genes'],
+        ligand_receptor_pairs=data['ligand_receptor_pairs'],
+        receptor_gene_pairs=data['receptor_gene_pairs'],
+        cell_type_assignments=data['cell_type_assignments'],
+        prior_grns=data['prior_grns']
+    )
+    
+    # Create random current y values for testing
+    # Shape: (n_cells, n_genes)
+    current_y = torch.randn(data['n_cells'], data['n_genes'])
+    
+    # Set up time points and create interpolator for history
+    time_points = torch.arange(data['n_time_points'], dtype=torch.float32)
+    history_interpolator = HistoryInterpolator(
+        time_points=time_points,
+        historical_data=data['gene_expression']
+    )
+    
+    # Test parameters
+    cell_idx = 0
+    time_point = 10.0  # float for continuous time
+    delta_gl = 1
+    delta_lr = 5
+    delta_rg = 3
+    delta_gg = 7  # Note: This will be ignored for gene nodes in ODE mode
+    
+    # First construct a base graph and update with neighbors
+    base_graph = graph_constructor.construct_base_graph(cell_idx)
+    updated_graph = graph_constructor.update_graph_with_neighbors(
+        graph=base_graph,
+        cell_idx=cell_idx,
+        cell_positions=data['cell_positions'],
+        time_point=int(time_point),  # convert to int for discrete time point
+        distance_threshold=15.0
+    )
+    
+    # Assign features using the ODE version
+    pyg_graph = graph_constructor.assign_node_features_ode(
+        graph=updated_graph,
+        cell_idx_in_dataset=cell_idx,
+        current_ode_time_t=time_point,
+        current_y_for_cell=current_y[cell_idx],
+        history_interpolator=history_interpolator,
+        delta_gl=delta_gl,
+        delta_lr=delta_lr,
+        delta_rg=delta_rg,
+        delta_gg=delta_gg
+    )
+    
+    # Basic validation
+    assert isinstance(pyg_graph.x, torch.Tensor), "Node features should be a torch.Tensor"
+    assert len(updated_graph.nodes()) == pyg_graph.x.shape[0], "Number of nodes should match number of features"
+    assert pyg_graph.x.shape[1] == 1, "Each feature should be 1-dimensional (scalar)"
+    assert hasattr(pyg_graph, 'gene_node_indices'), "PyG graph should have gene_node_indices"
+    assert len(pyg_graph.gene_node_indices) == len(data['genes']), "Should have indices for all genes"
+    
+    # Validate feature values
+    for node_idx, node in enumerate(updated_graph.nodes()):
+        feature_value = pyg_graph.x[node_idx, 0].item()
+        node_type = updated_graph.nodes[node].get('type', 'gene')
+        
+        if node_type == 'gene':
+            # For gene nodes in ODE mode, always use current_y regardless of delta_gg
+            gene_idx = graph_constructor.gene_indices[node]
+            expected = current_y[cell_idx, gene_idx].item()
+            assert abs(feature_value - expected) < 1e-6, f"Gene {node} feature mismatch"
+            
+        elif node_type == 'ligand':
+            # Ligand nodes use interpolated history with delta_gl
+            gene = updated_graph.nodes[node]['gene']
+            gene_idx = graph_constructor.gene_indices[gene]
+            expected = history_interpolator.interpolate(
+                t_query=time_point - delta_gl,
+                cell_idx=cell_idx,
+                gene_idx=gene_idx
+            )
+            assert abs(feature_value - expected) < 1e-6, f"Ligand {node} feature mismatch"
+            
+        elif node_type == 'input_ligand':
+            # Input ligands use interpolated history from neighbor cells
+            neighbor_cell = int(updated_graph.nodes[node]['cell'])
+            gene = updated_graph.nodes[node]['gene']
+            gene_idx = graph_constructor.gene_indices[gene]
+            expected = history_interpolator.interpolate(
+                t_query=time_point - delta_lr,
+                cell_idx=neighbor_cell,
+                gene_idx=gene_idx
+            )
+            assert abs(feature_value - expected) < 1e-6, f"Input ligand {node} feature mismatch"
+            
+        elif node_type == 'receptor':
+            # Receptor nodes use interpolated history with delta_rg
+            gene = updated_graph.nodes[node]['gene']
+            gene_idx = graph_constructor.gene_indices[gene]
+            expected = history_interpolator.interpolate(
+                t_query=time_point - delta_rg,
+                cell_idx=cell_idx,
+                gene_idx=gene_idx
+            )
+            assert abs(feature_value - expected) < 1e-6, f"Receptor {node} feature mismatch"
+    
+    print("✅ All assign_node_features_ode tests passed!")
+    return pyg_graph
+
 if __name__ == "__main__":
     # Create test data
     data = create_test_data()
@@ -996,4 +1107,8 @@ if __name__ == "__main__":
     # Run the tests
     results = test_graph_constructor()
     
-    print("\nCheck the results directory for visualizations.") 
+    print("\nCheck the results directory for visualizations.")
+    
+    # Add test for ODE features
+    print("\nTesting assign_node_features_ode...")
+    test_assign_node_features_ode() 

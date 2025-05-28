@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from tqdm import tqdm
 
 from models.staged import STAGED
-from models.inference_processor import STAGEDProcessor, PredictionOutput
+from models.inference_processor import STAGEDProcessor, PredictionOutput, ODEPredictionOutput
 
 @dataclass
 class ModelConfig:
@@ -46,6 +46,8 @@ def train_staged_model(
     prior_grns: Dict[Any, Any],
     prediction_mode: str = "one_step",
     k_steps: Optional[int] = None,
+    ode_eval_times: Optional[torch.Tensor] = None,
+    ode_method: str = 'dopri5',
     config: Optional[TrainingConfig] = None,
 ) -> TrainingOutput:
     """
@@ -61,8 +63,10 @@ def train_staged_model(
         receptor_gene_pairs: List of (receptor, gene) pairs
         cell_type_assignments: Cell type assignments
         prior_grns: Dictionary of prior GRNs
-        prediction_mode: One of ["one_step", "k_step", "full"]
+        prediction_mode: One of ["one_step", "k_step", "full", "ode"]
         k_steps: Number of steps for k-step prediction (required if mode is "k_step")
+        ode_eval_times: Times to evaluate ODE at (required if mode is "ode")
+        ode_method: ODE integration method for ODE mode
         config: Training configuration
         
     Returns:
@@ -74,6 +78,12 @@ def train_staged_model(
     if config.model_config is None:
         config.model_config = ModelConfig()
     device = config.device or torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    
+    # Validate ODE mode parameters
+    if prediction_mode == "ode":
+        if ode_eval_times is None:
+            raise ValueError("ode_eval_times must be provided for ODE prediction mode")
+        ode_eval_times = ode_eval_times.to(device)
     
     # Initialize model
     model = STAGED(
@@ -101,6 +111,10 @@ def train_staged_model(
         distance_threshold=config.distance_threshold,
         device=device
     )
+    
+    # Setup ODE if needed
+    if prediction_mode == "ode":
+        processor.setup_ode(data['gene_expression'])
     
     # Initialize optimizer
     optimizer = torch.optim.Adam(
@@ -132,32 +146,70 @@ def train_staged_model(
     for iteration in pbar:
         optimizer.zero_grad()
         
-        # Initialize prediction collection tensor
-        n_prediction_steps = data['gene_expression'].shape[0] - min_time
-        predictions = torch.zeros(
-            (n_prediction_steps, data['n_cells'], len(genes)),
-            device=device
-        )
-        
-        # Generate predictions for each time point
-        for t in range(min_time, data['gene_expression'].shape[0]):
-            # Get predictions for current time point
-            output = processor.predict(
-                data=data,
-                time_point=t
+        if prediction_mode == "ode":
+            # ODE training mode
+            total_loss = 0.0
+            n_training_segments = 0
+            
+            # Train on segments of the time series
+            for start_time in range(min_time, data['gene_expression'].shape[0] - len(ode_eval_times) + 1):
+                # Set up time range for this segment
+                initial_time = float(start_time)
+                eval_times_segment = ode_eval_times + start_time
+                
+                # Get ODE predictions
+                ode_output = processor.predict_ode(
+                    data=data,
+                    initial_time=initial_time,
+                    eval_times=eval_times_segment,
+                    method=ode_method,
+                    store_attention=False  # Don't store attention during training for efficiency
+                )
+                
+                # Get ground truth targets for this segment
+                target_indices = [int(t) for t in eval_times_segment if t < data['gene_expression'].shape[0]]
+                if len(target_indices) == len(eval_times_segment):
+                    target = data['gene_expression'][target_indices].to(device)
+                    
+                    # Compute loss for this segment
+                    segment_loss = criterion(ode_output.predictions[:len(target_indices)], target)
+                    total_loss += segment_loss
+                    n_training_segments += 1
+            
+            if n_training_segments == 0:
+                raise ValueError("No valid training segments found for ODE mode")
+            
+            # Average loss across segments
+            loss = total_loss / n_training_segments
+            
+        else:
+            # Original training modes (one_step, k_step, full)
+            # Initialize prediction collection tensor
+            n_prediction_steps = data['gene_expression'].shape[0] - min_time
+            predictions = torch.zeros(
+                (n_prediction_steps, data['n_cells'], len(genes)),
+                device=device
             )
             
-            if prediction_mode == "one_step":
-                # Store one-step prediction
-                predictions[t - min_time] = output.predictions
-            else:
-                raise NotImplementedError(
-                    f"Prediction mode {prediction_mode} not yet implemented"
+            # Generate predictions for each time point
+            for t in range(min_time, data['gene_expression'].shape[0]):
+                # Get predictions for current time point
+                output = processor.predict(
+                    data=data,
+                    time_point=t
                 )
-        
-        # Compute loss
-        target = data['gene_expression'][min_time:].to(device)
-        loss = criterion(predictions, target)
+                
+                if prediction_mode == "one_step":
+                    # Store one-step prediction
+                    predictions[t - min_time] = output.predictions
+                else:
+                    raise NotImplementedError(
+                        f"Prediction mode {prediction_mode} not yet implemented"
+                    )
+            
+            # Compute loss
+            target = data['gene_expression'][min_time:].to(device)
+            loss = criterion(predictions, target)
         
         # Backward pass and optimization
         loss.backward()
