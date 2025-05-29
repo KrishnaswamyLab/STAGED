@@ -19,7 +19,7 @@ import numpy as np
 from models.training import train_staged_model, TrainingConfig, ModelConfig
 from utils.data_factory import get_data, get_available_data_types
 from utils.visualization import plot_training_results, save_results, print_training_summary
-
+import os
 
 def parse_eval_times(eval_times_str: str, device: torch.device) -> torch.Tensor:
     """Parse evaluation times from string."""
@@ -97,8 +97,10 @@ def parse_args():
                        help='Learning rate')
     parser.add_argument('--weight_decay', type=float, default=1e-5,
                        help='Weight decay')
+    
     parser.add_argument('--patience', type=int, default=10,
                        help='Patience for early stopping')
+    
     parser.add_argument('--validation_fraction', type=float, default=0.2,
                        help='Fraction of training time points to use for validation')
     
@@ -140,7 +142,7 @@ def print_configuration(args, eval_times=None):
     print(f"  Mode: {args.mode}")
     print(f"  Data: {args.data}")
     print(f"  Iterations: {args.iterations}")
-    print(f"  Learning rate: {args.lr}")
+    print(f"  Learning rate: {args.learning_rate}")
     print(f"  Batch size: {args.batch_size}")
     print(f"  Hidden dim: {args.hidden_dim}")
     print(f"  Delta parameters: GL={args.delta_gl}, LR={args.delta_lr}, RG={args.delta_rg}, GG={args.delta_gg}")
@@ -163,8 +165,8 @@ def create_configurations(args, device):
     """Create model and training configurations."""
     model_config = ModelConfig(
         hidden_dim=args.hidden_dim,
-        num_gat_layers=args.gat_layers,
-        num_mlp_layers=args.mlp_layers,
+        num_gat_layers=args.num_gat_layers,
+        num_mlp_layers=args.num_mlp_layers,
         dropout=args.dropout,
         delta_gl=args.delta_gl,
         delta_lr=args.delta_lr,
@@ -174,7 +176,7 @@ def create_configurations(args, device):
     
     training_config = TrainingConfig(
         max_iterations=args.iterations,
-        learning_rate=args.lr,
+        learning_rate=args.learning_rate,
         batch_size=args.batch_size,
         device=device,
         model_config=model_config
@@ -198,9 +200,9 @@ def prepare_mode_kwargs(args, device):
     # Load data
     print("Loading data...")
     
-    gene_expression_data, genes = load_gene_expression_data(args.expression_data)
-    cell_positions = load_cell_positions(args.positions_data)
-    ligand_receptor_pairs = load_ligand_receptor_pairs(args.lr_pairs_data)
+    # gene_expression_data, genes = load_gene_expression_data(args.expression_data)
+    # cell_positions = load_cell_positions(args.positions_data)
+    # ligand_receptor_pairs = load_ligand_receptor_pairs(args.lr_pairs_data)
     
 
     ##TODO: We should change this to pass the paths as parameters, not the preprocessing pipeline
@@ -463,7 +465,7 @@ def main():
     parser.add_argument('--iterations', type=int, default=50,
                        help='Number of training iterations')
     
-    parser.add_argument('--lr', type=float, default=0.01,
+    parser.add_argument('--learning_rate', type=float, default=0.01,
                        help='Learning rate')
     
     parser.add_argument('--batch_size', type=int, default=4,
@@ -473,10 +475,10 @@ def main():
     parser.add_argument('--hidden_dim', type=int, default=64,
                        help='Hidden dimension size')
     
-    parser.add_argument('--gat_layers', type=int, default=1,
+    parser.add_argument('--num_gat_layers', type=int, default=1,
                        help='Number of GAT layers (must be 1 for current STAGED implementation)')
     
-    parser.add_argument('--mlp_layers', type=int, default=3,
+    parser.add_argument('--num_mlp_layers', type=int, default=3,
                        help='Number of MLP layers')
     
     parser.add_argument('--dropout', type=float, default=0.1,
@@ -510,12 +512,24 @@ def main():
     parser.add_argument('--save_dir', type=str, default=None,
                        help='Directory to save results (if not specified, results are displayed only)')
     
-    parser.add_argument('--device', type=str, default='auto',
-                       choices=['auto', 'cpu', 'cuda'],
+    parser.add_argument('--device', type=str, default='cuda',
+                       choices=['auto', 'cpu', 'cuda','mps'],
                        help='Device to use for training')
     
     parser.add_argument('--seed', type=int, default=42,
                        help='Random seed for reproducibility')
+    
+    parser.add_argument('--patience', type=int, default=10,
+                       help='Patience for early stopping')
+    
+    parser.add_argument('--max_iterations', type=int, default=10,
+                       help='Maximum number of training iterations')
+    
+    # Visualization
+    parser.add_argument('--visualize', action='store_false',
+                       help='Visualize results')
+    parser.add_argument('--output_dir', type=str, default='results',
+                       help='Output directory for results and visualizations')
     
     args = parser.parse_args()
     

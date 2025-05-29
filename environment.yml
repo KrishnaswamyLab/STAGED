@@ -26,6 +26,7 @@ dependencies:
   - pyg
   - tqdm
 
+
   # --------- loggers --------- #
   # - wandb
   - pip>=23
@@ -34,4 +35,6 @@ dependencies:
       - hydra-colorlog
       - rootutils
       - torch_geometric
-      # - phate
+      
+        #ODE dependencies
+      - torchdiffeq

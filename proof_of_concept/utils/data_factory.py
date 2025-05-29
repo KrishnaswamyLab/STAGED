@@ -10,9 +10,10 @@ import numpy as np
 import networkx as nx
 from typing import Dict
 
-from tests.temporal_data_generator import create_oscillatory_dynamics_data, create_damped_oscillator_data
-from tests.test_graph_constructor import create_hex_grid_test_data, create_square_grid_data
 
+from proof_of_concept.tests.temporal_data_generator import create_oscillatory_dynamics_data, create_damped_oscillator_data
+from proof_of_concept.tests.test_graph_constructor import create_hex_grid_test_data, create_square_grid_data
+from proof_of_concept.utils.simulated_data_processing import retrieve_simulated_data
 
 def create_simple_sinusoidal_data(
     n_time_points: int = 20,
@@ -141,10 +142,21 @@ def get_data(data_type: str, device: torch.device) -> Dict:
         print("Creating simple sinusoidal data...")
         return create_simple_sinusoidal_data(device=device)
     
+    elif data_type== "simulated":
+        print("Retriving simulated data...")
+        data = retrieve_simulated_data(data_dir="data/raw",sim_file="100_simulation_results.pkl")
+        # Convert to device
+        for key, value in data.items():
+            print(f"Converting {key} to device {device}")
+
+            if isinstance(value, torch.Tensor):
+                data[key] = value.to(device)
+        return data
+    
     else:
         raise ValueError(f"Unknown data type: {data_type}")
 
 
 def get_available_data_types():
     """Get list of available data types."""
-    return ['oscillatory', 'damped_oscillator', 'hex_grid', 'square_grid', 'sinusoidal'] 
+    return ['oscillatory', 'damped_oscillator', 'hex_grid', 'square_grid', 'sinusoidal', 'simulated'] 

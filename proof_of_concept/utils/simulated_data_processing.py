@@ -37,7 +37,7 @@ def retrieve_simulated_data(data_dir="data/raw",sim_file="simulation_results.pkl
     # Extract gene expression data (time_points x cells x genes)
     data['gene_expression'] = torch.tensor(sim_data['genes'],dtype=torch.float32)
     # Extract cell positions (time_points x cells x 2)
-    data['cell_positions'] = torch.tensor(sim_data['positions'])
+    data['cell_positions'] = torch.tensor(sim_data['positions'],dtype=torch.float32)
 
     # Extract metadata
     metadata = sim_data['metadata']
