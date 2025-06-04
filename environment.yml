@@ -38,3 +38,5 @@ dependencies:
       
         #ODE dependencies
       - torchdiffeq
+
+      - anndata

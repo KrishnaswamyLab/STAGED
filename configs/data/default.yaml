@@ -1,9 +1,0 @@
-
-_target_: src.data.spatial_temporal_datamodule.SpatialTemporalDataModule
-data_dir: ${paths.data_dir}
-batch_size: 128 # Needs to be divisible by the number of devices (e.g., if in a distributed setup)
-# train_val_test_split: [55_000, 5_000, 10_000]
-train_val_test_split: [1, 1, 1]
-num_workers: 0
-pin_memory: False
-time_lag: 5

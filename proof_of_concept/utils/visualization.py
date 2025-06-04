@@ -46,13 +46,18 @@ def visualize_graph(graph, title, output_dir='results', save_plot=False, show_pl
     ligand_pos = {k: (v[0], v[1] + 0.5) for k, v in ligand_pos.items()}
     pos.update(ligand_pos)
     
-    # Position input ligand nodes to the right
-    for i, node in enumerate(input_ligand_nodes):
-        # Extract cell and gene info from the node name
-        cell = graph.nodes[node].get('cell')
-        gene = graph.nodes[node].get('gene')
+        # Position ligand nodes above receptors
+    ligand_pos = nx.circular_layout(nx.Graph([(l, l2) for l in input_ligand_nodes for l2 in input_ligand_nodes if l != l2]))
+    ligand_pos = {k: (v[0], v[1] + 0.5) for k, v in ligand_pos.items()}
+    pos.update(ligand_pos)
+
+    # # Position input ligand nodes to the right
+    # for i, node in enumerate(input_ligand_nodes):
+    #     # Extract cell and gene info from the node name
+    #     cell = graph.nodes[node].get('cell')
+    #     gene = graph.nodes[node].get('gene')
         # Position based on cell ID (horizontal spread) and gene (vertical position)
-        pos[node] = (1.5 + int(cell) * 0.6, -0.3 + int(gene.split('_')[1]) * 0.3)
+        # pos[node] = (1.5 + int(cell) * 0.6, -0.3 + int(gene.split('_')[1]) * 0.3)
     
     # Draw the nodes with different colors by type
     nx.draw_networkx_nodes(graph, pos, nodelist=gene_nodes, node_color='lightblue', 

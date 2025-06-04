@@ -1,7 +1,0 @@
-defaults:
-  - data: default
-  - logging: default
-  - model: default
-  - reports: default
-  - training: default
-  - paths: default

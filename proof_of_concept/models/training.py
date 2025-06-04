@@ -18,7 +18,7 @@ class ModelConfig:
     delta_lr: int = 5
     delta_rg: int = 3
     delta_gg: int = 7
-    add_self_loops: bool = True
+    add_self_loops: bool = False
 
 @dataclass
 class TrainingConfig:
@@ -27,7 +27,7 @@ class TrainingConfig:
     learning_rate: float = 0.001
     weight_decay: float = 1e-5
     batch_size: int = 32
-    distance_threshold: float = 10.0
+    distance_threshold: float = 1.0
     device: Optional[torch.device] = None
     model_config: Optional[ModelConfig] = None
     output_model_path: str = "trained_model.pth"
@@ -48,7 +48,7 @@ def train_staged_model(
     prediction_mode: str = "one_step",
     k_steps: Optional[int] = None,
     ode_eval_times: Optional[torch.Tensor] = None,
-    ode_method: str = 'dopri5',
+    ode_method: str = 'rk4',
     config: Optional[TrainingConfig] = None,
 ) -> TrainingOutput:
     """
@@ -116,6 +116,8 @@ def train_staged_model(
     # Setup ODE if needed
     if prediction_mode == "ode":
         processor.setup_ode(data['gene_expression'])
+    if prediction_mode == "ode_new":
+        processor.setup_ode(data['gene_expression'])
     
     # Initialize optimizer
     optimizer = torch.optim.Adam(
@@ -182,7 +184,38 @@ def train_staged_model(
             
             # Average loss across segments
             loss = total_loss / n_training_segments
+        
+        elif prediction_mode == "ode_new":
+            # ODE training mode - individual timepoint predictions (like original structure)
+            # Initialize prediction collection tensor
+            n_prediction_steps = data['gene_expression'].shape[0] - min_time
+            predictions = torch.zeros(
+                (n_prediction_steps, data['n_cells'], len(genes)),
+                device=device
+            )
             
+            # Generate ODE predictions for each time point individually
+            
+            for t in range(min_time, data['gene_expression'].shape[0]):
+                # Set up single timepoint evaluation
+                print(t)
+                initial_time = float(t)
+                eval_times_single = torch.tensor([t], dtype=torch.float)  # Single timepoint
+                
+                # Get ODE predictions for this single timepoint
+                ode_output = processor.predict_ode_new(
+                    data=data,
+                    time_point=t,
+                    method=ode_method,
+                    store_attention=False  # Don't store attention during training for efficiency
+                )
+                
+                # Store prediction for current time point
+                predictions[t - min_time] = ode_output.predictions[0]  # Take first (and only) prediction
+            
+            # Compute loss (same as original approach)
+            target = data['gene_expression'][min_time:].to(device)
+            loss = criterion(predictions, target)
         else:
             # Original training modes (one_step, k_step, full)
             # Initialize prediction collection tensor

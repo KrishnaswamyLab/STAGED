@@ -1,4 +1,0 @@
-# Reports and Figures
-reports_dir: reports
-figures_dir: ${reports.reports_dir}/figures
-predictions_dir: ${reports.reports_dir}/predictions

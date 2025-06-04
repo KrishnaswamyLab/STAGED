@@ -12,7 +12,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 
 from utils.graph_constructor import GraphConstructor
 from utils.interpolation import HistoryInterpolator
-from utils.simulated_data_processing import retrieve_simulated_data
+from utils.simulated_data_processing import retrieve_simulated_data,retrieve_real_data
 
 class TestGraphConstructor(unittest.TestCase):
 
@@ -708,12 +708,12 @@ def validate_receptor_connections(graph, receptor_gene_pairs):
     return is_valid, mismatches
 
 
-def test_graph_constructor():
+def test_graph_constructor(data=create_test_data()):
     """
     Test the GraphConstructor class with toy data and visualize graphs for all cells
     """
     # Create test data
-    data = create_test_data()
+    # data = create_test_data()
     
     # Initialize the GraphConstructor with receptor_gene_pairs
     graph_constructor = GraphConstructor(
@@ -1088,25 +1088,25 @@ if __name__ == "__main__":
     # Create test data
     # data = create_test_data()
     
-    data = retrieve_simulated_data()
+    data = retrieve_real_data()
     # Only print a subset of the time points to keep output readable
     print_subset_time_points = [0, 3, 5, 7, 10, 14]  # Selected time points to print
     
-    print("\nGene Expression Data (selected time points):")
-    for t in print_subset_time_points:
-        print(f"\nTime point {t}:")
-        print("Cell | " + " | ".join([f"Gene {g}" for g in range(data['n_genes'])]))
-        print("-" * (6 + data['n_genes'] * 10))
-        for c in range(data['n_cells']):
-            # Get the actual values for this cell at this time point
-            values = [data['gene_expression'][t, c, g].item() for g in range(data['n_genes'])]
-            print(f"{c:4d} | " + " | ".join([f"{val:7.2f}" for val in values]))
+    # print("\nGene Expression Data (selected time points):")
+    # for t in print_subset_time_points:
+    #     print(f"\nTime point {t}:")
+    #     print("Cell | " + " | ".join([f"Gene {g}" for g in range(data['n_genes'])]))
+    #     print("-" * (6 + data['n_genes'] * 10))
+    #     for c in range(data['n_cells']):
+    #         # Get the actual values for this cell at this time point
+    #         values = [data['gene_expression'][t, c, g].item() for g in range(data['n_genes'])]
+    #         # print(f"{c:4d} | " + " | ".join([f"{val:7.2f}" for val in values]))
     
     # Create comparative visualization of all cells
-    visualize_all_cells_comparison(data)
+    # visualize_all_cells_comparison(data)
     
     # Run the tests
-    results = test_graph_constructor()
+    results = test_graph_constructor(data)
     
     print("\nCheck the results directory for visualizations.")
     

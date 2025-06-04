@@ -39,6 +39,7 @@ class GraphConstructor:
                 self.receptor_targets[receptor] = set()
             self.receptor_targets[receptor].add(target_gene)
         
+        
     def construct_base_graph(self, cell_idx):
         """
         Construct a base graph for a cell based on its cell type
@@ -56,16 +57,18 @@ class GraphConstructor:
             cell_type = cell_type.item()
             
         base_grn = self.prior_grns[cell_type].copy()
+        # import pdb;pdb.set_trace()
         
         # Create a mapping from gene IDs to node indices in the graph
         node_mapping = {}
-        
+        # import pdb;pdb.set_trace()
         # Add gene nodes first
         for gene_idx, gene in enumerate(self.genes):
             node_mapping[gene] = gene_idx
             if gene not in base_grn.nodes():
                 base_grn.add_node(gene)
-                
+        # import pdb;pdb.set_trace()
+        
         # Add receptor nodes for receptor genes
         for gene in self.receptor_genes:
             receptor_node = f"r_{gene}"
@@ -287,13 +290,18 @@ class GraphConstructor:
         node_features = {}
         gene_node_indices = []
         node_list = list(graph.nodes())
-
+        
         for i, node in enumerate(node_list):
             node_type = graph.nodes[node].get('type', 'gene')
             feature_val = 0.0
 
             if node_type == 'gene':
                 gene_id = node
+                # import pdb; pdb.set_trace()
+
+                # inverting gene and idx
+                # gene_mapping = {v: k for k, v in self.gene_indices.items()}
+
                 gene_idx = self.gene_indices[gene_id]
                 gene_node_indices.append(i)
                 # Use current ODE state for gene nodes
