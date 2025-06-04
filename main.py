@@ -12,22 +12,20 @@ Usage:
 """
 
 import argparse
-import sys
 import torch
-from pathlib import Path
 
-from src.trainer.trainer import STAGEDTrainer
-# from src.evaluation.evaluator import STAGEDEvaluator
-# from src.prediction.predictor import STAGEDPredictor
+from src.trainer.predictor import save_predictions, InferenceOutput, print_inference_summary
 from src.config.config import load_config
-from src.utils.data_factory import get_data, get_available_data_types
+from src.utils.data_factory import get_data
+from src.trainer.trainer import STAGEDTrainer
 
-def main():
+def parse_args():
+    """Parse command line arguments."""
     parser = argparse.ArgumentParser(description='STAGED: Spatiotemporal Analysis of Gene Expression Dynamics')
     
-    # Core arguments. The rest is on the config file.
+    # Core arguments
     parser.add_argument('--mode', 
-                       choices=['train', 'eval', 'predict'], 
+                       choices=['train', 'eval', 'inference'], 
                        required=True,
                        help='Operation mode: train model, evaluate model, or make predictions')
     
@@ -53,11 +51,37 @@ def main():
                        default=None,
                        help='Override random seed from config')
     
-    args = parser.parse_args()
-
-    # Load configuration
-    config = load_config(args.config)
+    # Prediction-specific arguments
+    parser.add_argument('--initial_time',
+                       type=int,
+                       default=None,
+                       help='Initial time point for predictions')
     
+    parser.add_argument('--prediction_steps',
+                       type=int,
+                       default=None,
+                       help='Number of time steps to predict')
+    
+    parser.add_argument('--checkpoint_path',
+                       type=str,
+                       default=None,
+                       help='Path to model checkpoint. Required for inference mode.')
+    
+    parser.add_argument('--cell_type_id',
+                       type=int,
+                       default=None,
+                       help='ID of the cell type to perform inference on')
+
+    args = parser.parse_args()
+    
+    # Validate arguments based on mode
+    if args.mode == 'inference' and args.checkpoint_path is None:
+        parser.error("--checkpoint_path is required for inference mode")
+    
+    return args
+
+def setup_environment(config, args):
+    """Setup the training environment."""
     # Override config with command line arguments if provided
     if args.device:
         config.system.device = args.device
@@ -74,34 +98,80 @@ def main():
     torch.manual_seed(config.system.seed)
     if torch.cuda.is_available():
         torch.cuda.manual_seed_all(config.system.seed)
+
+def main():
+    # Parse arguments
+    args = parse_args()
     
+    # Load configuration
+    config = load_config(args.config)
+    
+    # Setup environment
+    setup_environment(config, args)
+    
+    # Get data using the data factory
+    data = get_data(config.data.data_type, config.system.device)
+    
+    # Initialize trainer (this is used for training and inference.)
+    trainer = STAGEDTrainer(
+        data=data,
+        genes=data['genes'],
+        ligand_receptor_pairs=data['ligand_receptor_pairs'],
+        receptor_gene_pairs=data['receptor_gene_pairs'],
+        cell_type_assignments=data['cell_type_assignments'],
+        prior_grns=data['prior_grns'],
+        config=config
+    )
+
     # Execute based on mode
     if args.mode == 'train':
-        # Get data using the data factory
-        data = get_data(config.data.data_type, config.system.device)
-        
-        # Initialize and train model
-        trainer = STAGEDTrainer(
-            data=data,
-            genes=data['genes'],
-            ligand_receptor_pairs=data['ligand_receptor_pairs'],
-            receptor_gene_pairs=data['receptor_gene_pairs'],
-            cell_type_assignments=data['cell_type_assignments'],
-            prior_grns=data['prior_grns'],
-            config=config
-        )
         trainer.fit()
+        
+    elif args.mode == 'inference':
+        # Load the specified model checkpoint
+        trainer.load_checkpoint(args.checkpoint_path)
+        
+        # Get prediction parameters
+        initial_time = args.initial_time if args.initial_time is not None else 0
+        prediction_steps = args.prediction_steps if args.prediction_steps is not None else 10
+        
+        # Run prediction
+        predictions = trainer.inference(
+            initial_time=initial_time,
+            prediction_steps=prediction_steps,
+            store_attention=config.inference.store_attention if hasattr(config.inference, 'store_attention') else False
+        )
+        
+        # Create InferenceOutput object
+        inference_output = InferenceOutput(
+            predictions=predictions['predictions'],
+            attention_weights=predictions['attention_weights'],
+            time_points=predictions['time_points'].tolist(),
+            cell_type_filter=args.cell_type_id,
+            prediction_mode=config.training.prediction_mode,
+            model_config=config.model,
+            genes=config.data.genes if hasattr(config.data, 'genes') else None
+        )
+        
+        # Save predictions
+        output_path = save_predictions(
+            predictions=predictions,
+            config=config,
+            initial_time=initial_time,
+            prediction_steps=prediction_steps,
+            model_path=args.checkpoint_path
+        )
+        
+        # Print summary
+        print_inference_summary(inference_output)
+        
+        print(f"\nPredictions saved to: {output_path}")
         
     ##TODO: Implement evaluation mode
     # elif args.mode == 'eval':
-    #     evaluator = STAGEDEvaluator(config)
+    #     trainer, _ = initialize_trainer(config, args.checkpoint_path)
+    #     evaluator = STAGEDEvaluator(trainer)
     #     evaluator.evaluate()
-        
-    ##TODO: Implement prediction mode
-    # elif args.mode == 'predict':
-    #     predictor = STAGEDPredictor(config)
-    #     predictor.predict()
-        
     print(f"\n{args.mode.capitalize()} completed successfully!")
 
 if __name__ == "__main__":

@@ -36,7 +36,7 @@ class STAGEDTrainer:
         
         # Create checkpoint directory
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        self.checkpoint_dir = os.path.join(config.system.output_dir, f"checkpoints_{timestamp}")
+        self.checkpoint_dir = os.path.join(config.system.output_dir, "checkpoints", f"checkpoints_{timestamp}")
         os.makedirs(self.checkpoint_dir, exist_ok=True)
         
         # Create variables for convenience
@@ -173,6 +173,31 @@ class STAGEDTrainer:
                     f"k_steps ({self.config.training.k_steps}) must be less than available prediction steps "
                     f"({self.data['gene_expression'].shape[0] - self.min_time})"
                 )
+
+    def load_checkpoint(self, checkpoint_path: str):
+        """
+        Load a model checkpoint.
+        
+        Args:
+            checkpoint_path: Path to the checkpoint file
+        """
+        if not os.path.exists(checkpoint_path):
+            raise FileNotFoundError(f"Checkpoint file not found at {checkpoint_path}")
+        
+        # Load checkpoint
+        checkpoint = torch.load(checkpoint_path, map_location=self.device, weights_only=False)
+        
+        # Load model state
+        self.model.load_state_dict(checkpoint['model_state_dict'])
+        
+        # Load optimizer state if available
+        if 'optimizer_state_dict' in checkpoint:
+            self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+        
+        # Set model to eval mode
+        self.model.eval()
+        
+        print(f"Loaded checkpoint from {checkpoint_path}")
 
     def train_epoch(self):
         """Train for one epoch"""
@@ -320,3 +345,117 @@ class STAGEDTrainer:
             best_model_path=self.best_model_path,
             checkpoint_dir=self.checkpoint_dir
         )
+
+    def inference(
+        self,
+        initial_time: int,
+        prediction_steps: int,
+        cell_ids: Optional[List[int]] = None,
+        store_attention: bool = False
+    ) -> Dict[str, torch.Tensor]:
+        """
+        Generate predictions for gene expression over time.
+        
+        Args:
+            initial_time: Starting time point for predictions
+            prediction_steps: Number of time steps to predict
+            cell_ids: Optional list of cell IDs to predict for. If None, predicts for all cells.
+            store_attention: Whether to store attention weights during prediction
+            
+        Returns:
+            Dictionary containing:
+                - predictions: Tensor of shape (prediction_steps, n_cells, n_genes)
+                - time_points: Tensor of shape (prediction_steps,)
+                - attention_weights: Optional tensor of attention weights if store_attention=True
+        """
+        self.model.eval()
+        with torch.no_grad():
+            if self.config.training.prediction_mode == "ode":
+                # For ODE mode, we need to create evaluation times
+                eval_times = torch.arange(
+                    initial_time,
+                    initial_time + prediction_steps,
+                    device=self.device
+                ).float()
+                
+                # Get ODE predictions
+                ode_output = self.processor.predict_ode(
+                    data=self.data,
+                    initial_time=float(initial_time),
+                    eval_times=eval_times,
+                    method=self.config.training.ode_method if hasattr(self.config.training, 'ode_method') else 'rk4',
+                    cell_ids=cell_ids,
+                    store_attention=store_attention
+                )
+                
+                return {
+                    'predictions': ode_output.predictions,
+                    'gene_names': self.genes,
+                    'time_points': ode_output.eval_times,
+                    'attention_weights': ode_output.attention_weights if store_attention else None
+                }
+                
+            elif self.config.training.prediction_mode == "ode_new":
+                # For ODE new mode, we predict one step at a time
+                predictions = []
+                attention_weights = [] if store_attention else None
+                
+                current_time = initial_time
+                for _ in range(prediction_steps):
+                    # Get prediction for current time point
+                    output = self.processor.predict_ode_new(
+                        data=self.data,
+                        time_point=current_time,
+                        method=self.config.training.ode_method if hasattr(self.config.training, 'ode_method') else 'rk4',
+                        cell_ids=cell_ids,
+                        store_attention=store_attention
+                    )
+                    
+                    predictions.append(output.predictions)
+                    if store_attention and output.attention_weights is not None:
+                        attention_weights.append(output.attention_weights)
+                    
+                    current_time += 1
+                
+                # Stack predictions
+                predictions = torch.cat(predictions, dim=0)
+                if store_attention and attention_weights:
+                    attention_weights = torch.stack(attention_weights, dim=0)
+                
+                return {
+                    'predictions': predictions,
+                    'gene_names': self.genes,
+                    'time_points': torch.arange(initial_time, initial_time + prediction_steps, device=self.device),
+                    'attention_weights': attention_weights if store_attention else None
+                }
+                
+            else:
+                # For standard modes, we predict one step at a time
+                predictions = []
+                attention_weights = [] if store_attention else None
+                
+                current_time = initial_time
+                for _ in range(prediction_steps):
+                    # Get prediction for current time point
+                    output = self.processor.predict(
+                        data=self.data,
+                        time_point=current_time
+                    )
+                    
+                    predictions.append(output.predictions)
+                    if store_attention and output.attention_weights is not None:
+                        attention_weights.append(output.attention_weights)
+                    
+                    current_time += 1
+                
+                # Stack predictions
+                predictions = torch.cat(predictions, dim=0)
+                if store_attention and attention_weights:
+                    attention_weights = torch.stack(attention_weights, dim=0)
+                
+                return {
+                    'predictions': predictions,
+                    'gene_names': self.genes,
+                    'time_points': torch.arange(initial_time, initial_time + prediction_steps, device=self.device),
+                    'attention_weights': attention_weights if store_attention else None
+                }

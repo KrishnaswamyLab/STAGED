@@ -42,14 +42,19 @@ training:
   eval_times: "0.0,0.5,1.0,1.5"  # for ODE modes
   ode_method: "rk4"  # for ODE modes
 
+# Inference Configuration
+inference:
+  store_attention: false
+
 # System Configuration
 system:
   device: "auto"  # "auto", "cpu", "cuda", "mps"
   seed: 42
-  output_dir: "results/checkpoints"
-  visualize: true
+  output_dir: "results"
+  visualize: false
 
 # Logging Configuration
 logging:
   level: "INFO"
   save_logs: true
+

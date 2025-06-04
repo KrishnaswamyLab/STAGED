@@ -60,6 +60,11 @@ class LoggingConfig:
     save_logs: bool = True
 
 @dataclass
+class InferenceConfig:
+    """Inference configuration settings"""
+    store_attention: bool = True
+
+@dataclass
 class Config:
     """Single consolidated configuration class"""
     data: DataConfig = field(default_factory=DataConfig)
@@ -67,7 +72,8 @@ class Config:
     training: TrainingConfig = field(default_factory=TrainingConfig)
     system: SystemConfig = field(default_factory=SystemConfig)
     logging: LoggingConfig = field(default_factory=LoggingConfig)
-
+    inference: InferenceConfig = field(default_factory=InferenceConfig)
+    
 def load_config(config_path: str) -> Config:
     """
     Load configuration from YAML file and merge with defaults
@@ -95,6 +101,7 @@ def load_config(config_path: str) -> Config:
     training_config = TrainingConfig(**(yaml_config.get('training', {})))
     system_config = SystemConfig(**(yaml_config.get('system', {})))
     logging_config = LoggingConfig(**(yaml_config.get('logging', {})))
+    inference_config = InferenceConfig(**(yaml_config.get('inference', {})))
     
     # Create main config object
     config = Config(
@@ -102,7 +109,8 @@ def load_config(config_path: str) -> Config:
         model=model_config,
         training=training_config,
         system=system_config,
-        logging=logging_config
+        logging=logging_config,
+        inference=inference_config
     )
     
     # Create output directory if it doesn't exist
@@ -163,6 +171,9 @@ def save_config(config: Config, save_path: str) -> None:
         'logging': {
             'level': config.logging.level,
             'save_logs': config.logging.save_logs,
+        },
+        'inference': {
+            'store_attention': config.inference.store_attention,
         }
     }
     
