@@ -13,10 +13,14 @@ Usage:
 
 import argparse
 import sys
-from src.training.trainer import STAGEDTrainer
-from src.evaluation.evaluator import STAGEDEvaluator
-from src.prediction.predictor import STAGEDPredictor
-from config.config import load_config
+import torch
+from pathlib import Path
+
+from src.trainer.trainer import STAGEDTrainer
+# from src.evaluation.evaluator import STAGEDEvaluator
+# from src.prediction.predictor import STAGEDPredictor
+from src.config.config import load_config
+from src.utils.data_factory import get_data, get_available_data_types
 
 def main():
     parser = argparse.ArgumentParser(description='STAGED: Spatiotemporal Analysis of Gene Expression Dynamics')
@@ -56,24 +60,47 @@ def main():
     
     # Override config with command line arguments if provided
     if args.device:
-        config.device = args.device
+        config.system.device = args.device
     if args.output_dir:
-        config.output_dir = args.output_dir
+        config.system.output_dir = args.output_dir
     if args.seed:
-        config.seed = args.seed
+        config.system.seed = args.seed
+    
+    # Set device
+    if config.system.device == "auto":
+        config.system.device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    
+    # Set random seed for reproducibility
+    torch.manual_seed(config.system.seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(config.system.seed)
     
     # Execute based on mode
     if args.mode == 'train':
-        trainer = STAGEDTrainer(config)
-        trainer.train()
+        # Get data using the data factory
+        data = get_data(config.data.data_type, config.system.device)
         
-    elif args.mode == 'eval':
-        evaluator = STAGEDEvaluator(config)
-        evaluator.evaluate()
+        # Initialize and train model
+        trainer = STAGEDTrainer(
+            data=data,
+            genes=data['genes'],
+            ligand_receptor_pairs=data['ligand_receptor_pairs'],
+            receptor_gene_pairs=data['receptor_gene_pairs'],
+            cell_type_assignments=data['cell_type_assignments'],
+            prior_grns=data['prior_grns'],
+            config=config
+        )
+        trainer.fit()
         
-    elif args.mode == 'predict':
-        predictor = STAGEDPredictor(config)
-        predictor.predict()
+    ##TODO: Implement evaluation mode
+    # elif args.mode == 'eval':
+    #     evaluator = STAGEDEvaluator(config)
+    #     evaluator.evaluate()
+        
+    ##TODO: Implement prediction mode
+    # elif args.mode == 'predict':
+    #     predictor = STAGEDPredictor(config)
+    #     predictor.predict()
         
     print(f"\n{args.mode.capitalize()} completed successfully!")
 

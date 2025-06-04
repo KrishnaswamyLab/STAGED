@@ -198,7 +198,6 @@ def train_staged_model(
             
             for t in range(min_time, data['gene_expression'].shape[0]):
                 # Set up single timepoint evaluation
-                print(t)
                 initial_time = float(t)
                 eval_times_single = torch.tensor([t], dtype=torch.float)  # Single timepoint
                 

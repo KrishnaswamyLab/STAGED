@@ -25,17 +25,18 @@ model:
   delta_lr: 2  # ligand -> receptor
   delta_rg: 1  # receptor -> gene
   delta_gg: 0  # gene -> gene (should be 0 for ODE mode)
+  add_self_loops: true
 
 # Training Configuration
 training:
-  prediction_mode: "one_step"  # "one_step", "k_step", "ode", "ode_new"
+  prediction_mode: "ode_new"  # "one_step", "k_step", "ode", "ode_new"
   max_iterations: 50
   num_epochs: 10
   batch_size: 4
   learning_rate: 0.01
-  weight_decay: 1e-5
+  weight_decay: 1.0e-4
   patience: 10
-  
+
   # Mode-specific parameters
   k_steps: 3  # for k_step mode
   eval_times: "0.0,0.5,1.0,1.5"  # for ODE modes
@@ -45,7 +46,7 @@ training:
 system:
   device: "auto"  # "auto", "cpu", "cuda", "mps"
   seed: 42
-  output_dir: "results"
+  output_dir: "results/checkpoints"
   visualize: true
 
 # Logging Configuration

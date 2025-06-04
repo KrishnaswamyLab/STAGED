@@ -22,7 +22,7 @@ class STAGED(nn.Module):
         delta_lr=5,  # Time lag for ligand -> receptor 
         delta_rg=3,  # Time lag for receptor -> gene
         delta_gg=7,  # Time lag for gene -> gene
-        add_self_loops=True,
+        add_self_loops=False,
     ):
         super(STAGED, self).__init__()
         
