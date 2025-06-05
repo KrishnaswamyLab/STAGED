@@ -29,7 +29,7 @@ model:
 
 # Training Configuration
 training:
-  prediction_mode: "one_step"  # "one_step", "k_step", "ode", "ode_new"
+  prediction_mode: "one_step"  # "one_step", "k_step", "ode"
   max_iterations: 50
   num_epochs: 10
   batch_size: 4

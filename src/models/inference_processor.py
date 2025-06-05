@@ -97,9 +97,9 @@ class STAGEDProcessor:
         self.graph_handler = GraphDataHandler(self.model, device=self.device)
         
         # ODE-specific attributes (initialized when needed)
-        self._history_interpolator = None
-        self._ode_func = None
+        self._ode_func = None        # Create ODE function
         self.ode_integration_const = None
+
 
     def process_cell_data(
         self,
@@ -120,7 +120,6 @@ class STAGEDProcessor:
         Returns:
             Processed graph data in PyG format
         """
-        # print(cell_idx, time_point,gene_expression.shape, cell_positions.shape)
         # Validate cell index
         if cell_idx >= gene_expression.shape[1] or cell_idx < 0:
             raise ValueError(f"Invalid cell_idx {cell_idx}. Must be between 0 and {gene_expression.shape[1]-1}")
@@ -137,7 +136,6 @@ class STAGEDProcessor:
             )
 
         # Construct and process graph
-        
         base_graph = self.graph_constructor.construct_base_graph(cell_idx)
         updated_graph = self.graph_constructor.update_graph_with_neighbors(
             base_graph, cell_idx, cell_positions, time_point,
@@ -154,7 +152,8 @@ class STAGEDProcessor:
         cell_idx: int,
         t: float,
         current_y_for_cell: torch.Tensor,
-        cell_positions: torch.Tensor
+        cell_positions: torch.Tensor,
+  
     ) -> torch.Tensor:
         """
         Process single cell data into graph format for ODE mode.
@@ -164,13 +163,11 @@ class STAGEDProcessor:
             t: Current continuous time
             current_y_for_cell: Current ODE state for this cell's genes
             cell_positions: Cell positions tensor
-            
+            store_attention: Whether to store attention weights during integration
         Returns:
             Processed graph data in PyG format
         """
-        if self._history_interpolator is None:
-            raise ValueError("History interpolator not initialized. Call setup_ode() first.")
-            
+
         # Construct and process graph
         base_graph = self.graph_constructor.construct_base_graph(cell_idx)
         
@@ -181,20 +178,18 @@ class STAGEDProcessor:
             distance_threshold=self.distance_threshold
         )
     
-
         return self.graph_constructor.assign_node_features_ode(
             updated_graph, cell_idx, t, current_y_for_cell,
-            self._history_interpolator,
             self.model.delta_gl, self.model.delta_lr,
             self.model.delta_rg, self.model.delta_gg
         )
 
-    # @torch.no_grad()
     def predict(
         self,
         data: Dict[str, Any],
         time_point: int,
-        cell_ids: Optional[List[int]] = None
+        cell_ids: Optional[List[int]] = None,
+        store_attention: bool = False
     ) -> PredictionOutput:
         """
         Process raw data and generate predictions.
@@ -206,7 +201,7 @@ class STAGEDProcessor:
                 - n_cells: Total number of cells (optional if cell_ids provided)
             time_point: Current time point
             cell_ids: Optional list of cell IDs to predict for (if None, predict for all cells)
-            
+            store_attention: Whether to store attention weights during integration
         Returns:
             PredictionOutput containing:
                 - predictions: Predicted gene expression for next time step
@@ -252,32 +247,8 @@ class STAGEDProcessor:
         output = self.predict(*args, **kwargs)
         return output.predictions, output.attention_weights, output.node_pointers
 
-    # ======================== NEW ODE FUNCTIONALITY ========================
-    
-    def setup_ode(self, history_data: torch.Tensor):
-        """
-        Setup ODE functionality by creating history interpolator.
-        
-        Args:
-            history_data: Historical gene expression data (n_time_points, n_cells, n_genes)
-        """
-        n_time_points = history_data.shape[0]
-        time_points = torch.arange(n_time_points, dtype=torch.float32)
-        
-        self._history_interpolator = HistoryInterpolator(
-            time_points=time_points,
-            historical_data=history_data
-        )
-
-        
-        # Create ODE function
-        self._ode_func = self._create_ode_function()
-
     def _create_ode_function(self):
         """Create the ODE function that will be used by torchdiffeq."""
-        if self._history_interpolator is None:
-            raise ValueError("History interpolator not initialized.")
-        
 
         def ode_func(t: float, y: torch.Tensor) -> torch.Tensor:
             """
@@ -333,101 +304,6 @@ class STAGEDProcessor:
         
         return ode_func
 
-    def predict_ode(
-        self,
-        data: Dict[str, Any],
-        initial_time: float,
-        eval_times: torch.Tensor,
-        initial_state: Optional[torch.Tensor] = None,
-        method: str = 'dopri5',
-        cell_ids: Optional[List[int]] = None,
-        store_attention: bool = True
-    ) -> ODEPredictionOutput:
-        """
-        Predict using Neural ODE integration.
-        
-        Args:
-            data: Dictionary containing:
-                - gene_expression: Historical gene expression for interpolation
-                - cell_positions: Cell positions
-                - n_cells: Number of cells (optional if cell_ids provided)
-            initial_time: Starting time for integration
-            eval_times: Times to evaluate the solution at
-            initial_state: Initial condition (if None, uses gene_expression at initial_time)
-            method: ODE integration method
-            cell_ids: Optional list of cell IDs to predict for
-            store_attention: Whether to store attention weights during integration
-            
-        Returns:
-            ODEPredictionOutput with predictions, evaluation times, and optionally attention weights
-        """
-        
-        # Setup if not already done
-        if self._history_interpolator is None:
-            self.setup_ode(data['gene_expression'])
-        
-        # Store cell positions for ODE function access
-        self._cell_positions = data['cell_positions'].to(self.device)
-        
-        # Set up temporary storage for attention data
-        if store_attention:
-            self._temp_attention_storage = []
-            self._temp_pointer_storage = []
-        else:
-            self._temp_attention_storage = None
-            self._temp_pointer_storage = None
-        
-        try:
-            # Determine cells to process
-            if cell_ids is None:
-                if 'n_cells' not in data:
-                    raise KeyError("'n_cells' missing from data when cell_ids not provided")
-                n_cells = data['n_cells']
-            else:
-                n_cells = len(cell_ids)
-            
-            # Set up initial condition
-            if initial_state is None:
-                # Extract initial state from gene expression at initial_time
-                initial_time_idx = int(initial_time)
-                if cell_ids is None:
-                    initial_state = data['gene_expression'][initial_time_idx, :, :].view(-1)
-                else:
-                    initial_state = data['gene_expression'][initial_time_idx, cell_ids, :].view(-1)
-            
-            initial_state = initial_state.to(self.device)
-            eval_times = eval_times.to(self.device)
-            
-            # Integrate ODE
-            solution = odeint(
-                func=self._ode_func,
-                y0=initial_state,
-                t=eval_times,
-                method=method
-            )
-            
-            # Reshape solution to (n_eval_times, n_cells, n_genes)
-            n_eval_times = solution.shape[0]
-            predictions = solution.view(n_eval_times, n_cells, self.num_genes)
-            
-            # Collect attention data
-            attention_weights = self._temp_attention_storage if store_attention else None
-            node_pointers = self._temp_pointer_storage if store_attention else None
-            
-            return ODEPredictionOutput(
-                predictions=predictions, 
-                eval_times=eval_times,
-                attention_weights=attention_weights,
-                node_pointers=node_pointers
-            )
-            
-        finally:
-            # Clean up temporary storage
-            if hasattr(self, '_temp_attention_storage'):
-                delattr(self, '_temp_attention_storage')
-            if hasattr(self, '_temp_pointer_storage'):
-                delattr(self, '_temp_pointer_storage') 
-
     def predict_ode_new(
         self,
         data: Dict[str, Any],
@@ -445,20 +321,17 @@ class STAGEDProcessor:
                 - gene_expression: Historical gene expression for interpolation
                 - cell_positions: Cell positions
                 - n_cells: Number of cells (optional if cell_ids provided)
-            initial_time: Starting time for integration
-            eval_times: Times to evaluate the solution at
-            initial_state: Initial condition (if None, uses gene_expression at initial_time)
+            time_point: Current time point
+            initial_state: Initial condition (if None, uses gene_expression at time_point)
             method: ODE integration method
             cell_ids: Optional list of cell IDs to predict for
             store_attention: Whether to store attention weights during integration
             
         Returns:
-            ODEPredictionOutput with predictions, evaluation times, and optionally attention weights
+            PredictionOutput with predictions and optionally attention weights
         """
-        
-            # Setup if not already done
-        if self._history_interpolator is None:
-            self.setup_ode(data['gene_expression'])
+        # Setup if not already done
+        self._ode_func = self._create_ode_function()
 
         # Move data to device
         gene_expression = data['gene_expression'].to(self.device)
@@ -510,20 +383,9 @@ class STAGEDProcessor:
             
             # Take the prediction at the next time step (index 1)
             final_state = solution[-1]  # Shape: [n_cells * n_genes]
-            # print(solution.shape)
-            # print(solution)
-            predictions = final_state.view(1, n_cells, self.num_genes) - 1.5*torch.ones((1, n_cells, self.num_genes)) # Shape: [1, n_cells, n_genes]
-            # print(gene_expressions.shape)
-            # print(n_cells, self.num_genes)
-            # print(initial_state.shape)
-            # print(cell_ids)
-            # print(cell_ids.shape)
-            
-            # predictions = final_state.view(1, n_cells, self.num_genes) + self.ode_integration_const(initial_state).reshape([1, n_cells, self.num_genes]) # Shape: [1, n_cells, n_genes]
-            # predictions = final_state.view(1, n_cells, self.num_genes) + self.ode_integration_const(initial_state)*torch.ones((1, n_cells, self.num_genes))# Shape: [1, n_cells, n_genes]
-            # predictions = final_state.view(1, n_cells, self.num_genes)# Shape: [1, n_cells, n_genes]
 
-            # print(f"Predictions: {predictions}")
+            ##TODO: UNDERSTAND THE CONSTANT OVERSHOOT WE HAVE USING THE ODE
+            predictions = final_state.view(1, n_cells, self.num_genes) - 1.5*torch.ones((1, n_cells, self.num_genes)) # Shape: [1, n_cells, n_genes]
             
             # Collect attention data
             attention_weights = self._temp_attention_storage if store_attention else None

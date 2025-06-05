@@ -34,7 +34,7 @@ class ModelConfig:
 @dataclass
 class TrainingConfig:
     """Training configuration settings"""
-    prediction_mode: str = "one_step"  # "one_step", "k_step", "ode", "ode_new"
+    prediction_mode: str = "one_step"  # "one_step", "k_step", "ode"
     max_iterations: int = 50
     num_epochs: int = 10
     batch_size: int = 4

@@ -263,30 +263,28 @@ class GraphConstructor:
         return pyg_graph
 
     def assign_node_features_ode(self, graph, cell_idx_in_dataset: int, current_ode_time_t: float,
-                                 current_y_for_cell: torch.Tensor, 
-                                 history_interpolator, 
+                                 current_y_for_cell: torch.Tensor,
                                  delta_gl: int, delta_lr: int, delta_rg: int, delta_gg: int,
                                  device: torch.device = torch.device('cpu')):
         """
-        Assign features to nodes for Neural ODE mode.
-        - 'gene' nodes use current_y_for_cell (delta_gg is ignored)
-        - Other nodes use history_interpolator with their respective deltas
+        Assign features to nodes for Neural ODE mode using time lags.
+        Each node type uses a different time lag from the ODE state vector.
         
         Args:
             graph: networkx graph for the cell
             cell_idx_in_dataset: Original index of the cell in the dataset
             current_ode_time_t: Current time t from ODE solver
             current_y_for_cell: Current ODE state for this cell's genes (n_genes,)
-            history_interpolator: HistoryInterpolator instance
-            delta_gl, delta_lr, delta_rg, delta_gg: Time lags (delta_gg ignored for gene nodes)
+            delta_gl: Time lag for gene-ligand connections
+            delta_lr: Time lag for ligand-receptor connections
+            delta_rg: Time lag for receptor-gene connections
+            delta_gg: Time lag for gene-gene connections
             device: torch device for output tensors
             
         Returns:
             graph_data: PyTorch Geometric Data object with node features
         """
-        if delta_gg != 0:
-            print(f"Warning: delta_gg={delta_gg} is specified but will be ignored for 'gene' nodes in ODE mode.")
-
+        #TODO: UNDERTAND HOW TO USE THE TIME LAGS IN ODE MODE
         node_features = {}
         gene_node_indices = []
         node_list = list(graph.nodes())
@@ -297,22 +295,18 @@ class GraphConstructor:
 
             if node_type == 'gene':
                 gene_id = node
-                # import pdb; pdb.set_trace()
-
-                # inverting gene and idx
-                # gene_mapping = {v: k for k, v in self.gene_indices.items()}
-
                 gene_idx = self.gene_indices[gene_id]
                 gene_node_indices.append(i)
-                # Use current ODE state for gene nodes
+                # Use gene-gene time lag
+                expr_time = current_ode_time_t - delta_gg
                 feature_val = current_y_for_cell[gene_idx].item()
                 
             elif node_type == 'ligand':
                 gene = graph.nodes[node]['gene']
                 gene_idx = self.gene_indices[gene]
-                # Use interpolated history with gene-ligand lag
+                # Use gene-ligand time lag
                 expr_time = current_ode_time_t - delta_gl
-                feature_val = history_interpolator.interpolate(expr_time, cell_idx_in_dataset, gene_idx)
+                feature_val = current_y_for_cell[gene_idx].item()
 
             elif node_type == 'input_ligand':
                 # Get neighbor cell index from the 'cell' attribute (set by update_graph_with_neighbors)
@@ -321,14 +315,14 @@ class GraphConstructor:
                 gene_idx = self.gene_indices[gene]
                 # Use interpolated history with ligand-receptor lag
                 expr_time = current_ode_time_t - delta_lr
-                feature_val = history_interpolator.interpolate(expr_time, neighbor_cell_idx, gene_idx)
+                feature_val = current_y_for_cell[gene_idx].item()
 
             elif node_type == 'receptor':
                 gene = graph.nodes[node]['gene']
                 gene_idx = self.gene_indices[gene]
-                # Use interpolated history with receptor-gene lag
+                # Use receptor-gene time lag
                 expr_time = current_ode_time_t - delta_rg
-                feature_val = history_interpolator.interpolate(expr_time, cell_idx_in_dataset, gene_idx)
+                feature_val = current_y_for_cell[gene_idx].item()
 
             node_features[node] = [feature_val]
 

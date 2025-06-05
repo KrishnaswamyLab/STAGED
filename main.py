@@ -132,8 +132,7 @@ def main():
         # Load the specified model checkpoint
         trainer.load_checkpoint(args.checkpoint_path)
         
-        # Get prediction parameters
-        
+        ## Get prediction parameters
         # Ensure we have enough history for model lags
         min_time = max(trainer.model.delta_gl, trainer.model.delta_lr, trainer.model.delta_rg, trainer.model.delta_gg)
         initial_time = args.initial_time if args.initial_time is not None else min_time
