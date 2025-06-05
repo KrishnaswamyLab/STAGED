@@ -5,7 +5,7 @@ from datetime import datetime
 from dataclasses import dataclass
 from typing import Dict, List, Optional, Any
 import torch
-import glob
+
 
 @dataclass
 class InferenceOutput:

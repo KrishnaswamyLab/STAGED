@@ -125,14 +125,20 @@ def main():
 
     # Execute based on mode
     if args.mode == 'train':
-        trainer.fit()
-        
+        training_output = trainer.fit()
+        print(f"\nBest model saved to: {training_output.best_model_path}")
+
     elif args.mode == 'inference':
         # Load the specified model checkpoint
         trainer.load_checkpoint(args.checkpoint_path)
         
         # Get prediction parameters
-        initial_time = args.initial_time if args.initial_time is not None else 0
+        
+        # Ensure we have enough history for model lags
+        min_time = max(trainer.model.delta_gl, trainer.model.delta_lr, trainer.model.delta_rg, trainer.model.delta_gg)
+        initial_time = args.initial_time if args.initial_time is not None else min_time
+        initial_time = max(initial_time, min_time)
+
         prediction_steps = args.prediction_steps if args.prediction_steps is not None else 10
         
         # Run prediction

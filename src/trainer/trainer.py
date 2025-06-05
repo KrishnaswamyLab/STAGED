@@ -282,7 +282,7 @@ class STAGEDTrainer:
             (n_prediction_steps, self.n_cells, self.n_genes),
             device=self.device
         )
-        
+
         # Generate predictions for each time point
         for t in range(self.min_time, self.data['gene_expression'].shape[0]):
             # Get predictions for current time point
@@ -442,14 +442,16 @@ class STAGEDTrainer:
                         time_point=current_time
                     )
                     
-                    predictions.append(output.predictions)
+                    # Add time dimension to predictions (n_cells, n_genes) -> (1, n_cells, n_genes)
+                    predictions.append(output.predictions.unsqueeze(0))
+                    
                     if store_attention and output.attention_weights is not None:
                         attention_weights.append(output.attention_weights)
                     
                     current_time += 1
                 
-                # Stack predictions
-                predictions = torch.cat(predictions, dim=0)
+                # Stack predictions along time dimension
+                predictions = torch.cat(predictions, dim=0)  # This will give (times, cells, genes)
                 if store_attention and attention_weights:
                     attention_weights = torch.stack(attention_weights, dim=0)
                 
