@@ -14,10 +14,10 @@ Usage:
 import argparse
 import torch
 
-from src.trainer.predictor import save_predictions, InferenceOutput, print_inference_summary
-from src.config.config import load_config
-from src.utils.data_factory import get_data
-from src.trainer.trainer import STAGEDTrainer
+from trainer.predictor import save_predictions, InferenceOutput, print_inference_summary
+from config.config import load_config
+from utils.data_factory import get_data
+from trainer.trainer import STAGEDTrainer
 
 def parse_args():
     """Parse command line arguments."""

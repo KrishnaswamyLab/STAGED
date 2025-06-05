@@ -1,5 +1,7 @@
 import torch
-from torch_geometric.data import Batch
+from dataclasses import dataclass
+from typing import List, Tuple, Optional, Union
+from torch_geometric.data import Data, Batch
 from torch_geometric.loader import DataLoader
 
 

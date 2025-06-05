@@ -8,8 +8,8 @@ import json
 from datetime import datetime
 
 from src.models.staged import STAGED
-from src.models.inference_processor import STAGEDProcessor, PredictionOutput, ODEPredictionOutput
-from src.config.config import Config, load_config
+from src.data.data_processor import DataProcessor
+from src.config.config import Config
 
 @dataclass
 class TrainingOutput:
@@ -18,6 +18,14 @@ class TrainingOutput:
     model: STAGED
     best_model_path: str
     checkpoint_dir: str
+
+
+@dataclass
+class PredictionOutput:
+    """Structured output from prediction"""
+    predictions: torch.Tensor
+    attention_weights: Tuple[torch.Tensor, torch.Tensor]  # (edges, values)
+    node_pointers: torch.Tensor
 
 class STAGEDTrainer:
     def __init__(
@@ -29,6 +37,7 @@ class STAGEDTrainer:
         cell_type_assignments: Any,
         prior_grns: Dict[Any, Any],
         config: Config,
+
     ):
         # Setup configuration
         self.config = config
@@ -39,18 +48,10 @@ class STAGEDTrainer:
         self.checkpoint_dir = os.path.join(config.system.output_dir, "checkpoints", f"checkpoints_{timestamp}")
         os.makedirs(self.checkpoint_dir, exist_ok=True)
         
-        # Create variables for convenience
-        self.genes = genes
-        self.n_genes = len(genes)
-        self.n_cells = data['n_cells']
-        self.n_time_points = data['n_time_points']
-        
-        # Save initial config
-        self._save_config()
 
         # Initialize model
         self.model = STAGED(
-            num_genes=self.n_genes,
+            num_genes=len(genes),
             hidden_dim=config.model.hidden_dim,
             num_gat_layers=config.model.num_gat_layers,
             num_mlp_layers=config.model.num_mlp_layers,
@@ -61,19 +62,22 @@ class STAGEDTrainer:
             delta_gg=config.model.delta_gg if hasattr(config.model, 'delta_gg') else 7,
             add_self_loops=config.model.add_self_loops if hasattr(config.model, 'add_self_loops') else False,
         ).to(self.device)
-        
-        # Initialize processor
-        self.processor = STAGEDProcessor(
-            model=self.model,
+
+        # Initialize data processor
+        self.data_processor = DataProcessor(
             genes=genes,
             ligand_receptor_pairs=ligand_receptor_pairs,
             receptor_gene_pairs=receptor_gene_pairs,
             cell_type_assignments=cell_type_assignments,
             prior_grns=prior_grns,
-            batch_size=config.training.batch_size,
+            device=self.device,
             distance_threshold=config.data.distance_threshold if hasattr(config.data, 'distance_threshold') else 1.0,
-            device=self.device
+            batch_size=config.training.batch_size if hasattr(config.training, 'batch_size') else 32,
+            model=self.model
         )
+        
+        # Process data
+        self.processed_data = self.data_processor.preprocess_data(data)
         
         
         # Initialize optimizer
@@ -85,9 +89,6 @@ class STAGEDTrainer:
         
         # Initialize loss function
         self.criterion = nn.MSELoss()
-        
-        # Store data
-        self.data = data
         
         # Get minimum time point based on model lags
         self.min_time = max(
@@ -101,16 +102,17 @@ class STAGEDTrainer:
         self.best_loss = float('inf')
         self.best_model_path = None
         
-
+        # Save initial config
+        self._save_config()
 
     def _save_config(self):
         """Save the configuration to the checkpoint directory"""
         config_path = os.path.join(self.checkpoint_dir, 'config.json')
         config_dict = {
             'data': {
-                'n_genes': self.n_genes,
-                'n_cells': self.n_cells,
-                'n_time_points': self.n_time_points,
+                'n_genes': len(self.data_processor.genes),
+                'n_cells': self.processed_data.n_cells,
+                'n_time_points': self.processed_data.n_time_points,
             },
             'model': {
                 'hidden_dim': self.config.model.hidden_dim,
@@ -192,45 +194,46 @@ class STAGEDTrainer:
         return total_loss
 
     def _train_ode_mode(self):
-        """Train using ODE new mode"""
+        """Train using ODE mode"""
         # Initialize prediction collection tensor
-        n_prediction_steps = self.data['gene_expression'].shape[0] - self.min_time
+        n_prediction_steps = self.processed_data.gene_expression.shape[0] - self.min_time
         predictions = torch.zeros(
-            (n_prediction_steps, self.n_cells, self.n_genes),
+            (n_prediction_steps, self.processed_data.n_cells, len(self.data_processor.genes)),
             device=self.device
         )
         
         # Generate ODE predictions for each time point individually
-        for t in range(self.min_time, self.data['gene_expression'].shape[0]):
+        for t in range(self.min_time, self.processed_data.gene_expression.shape[0]):
             # Get ODE predictions for this single timepoint
-            ode_output = self.processor.predict_ode_new(
-                data=self.data,
+            output = self.model.predict_ode(
+                data=self.processed_data,
                 time_point=t,
                 method=self.config.training.ode_method if hasattr(self.config.training, 'ode_method') else 'rk4',
-                store_attention=False
+                store_attention=False,
+                ode_func=self.data_processor._create_ode_function()
             )
             
             # Store prediction for current time point
-            predictions[t - self.min_time] = ode_output.predictions[0]
+            predictions[t - self.min_time] = output.predictions[0]
         
         # Compute loss
-        target = self.data['gene_expression'][self.min_time:].to(self.device)
+        target = self.processed_data.gene_expression[self.min_time:].to(self.device)
         return self.criterion(predictions, target)
 
     def _train_standard_mode(self):
         """Train using standard modes (one_step, k_step)"""
         # Initialize prediction collection tensor
-        n_prediction_steps = self.data['gene_expression'].shape[0] - self.min_time
+        n_prediction_steps = self.processed_data.gene_expression.shape[0] - self.min_time
         predictions = torch.zeros(
-            (n_prediction_steps, self.n_cells, self.n_genes),
+            (n_prediction_steps, self.processed_data.n_cells, len(self.data_processor.genes)),
             device=self.device
         )
 
         # Generate predictions for each time point
-        for t in range(self.min_time, self.data['gene_expression'].shape[0]):
+        for t in range(self.min_time, self.processed_data.gene_expression.shape[0]):
             # Get predictions for current time point
-            output = self.processor.predict(
-                data=self.data,
+            output = self.model.predict(
+                data=self.processed_data,
                 time_point=t
             )
             
@@ -243,7 +246,7 @@ class STAGEDTrainer:
                 )
         
         # Compute loss
-        target = self.data['gene_expression'][self.min_time:].to(self.device)
+        target = self.processed_data.gene_expression[self.min_time:].to(self.device)
         return self.criterion(predictions, target)
 
     def evaluate(self):
@@ -319,9 +322,9 @@ class STAGEDTrainer:
             
             # Get prediction method based on mode
             predict_method = (
-                self.processor.predict_ode_new 
+                self.model.predict_ode 
                 if self.config.training.prediction_mode == "ode" 
-                else self.processor.predict
+                else self.model.predict
             )
             
             # Get method-specific kwargs
@@ -338,10 +341,11 @@ class STAGEDTrainer:
             for _ in range(prediction_steps):
                 # Get prediction for current time point
                 output = predict_method(
-                    data=self.data,
+                    data=self.processed_data,
                     time_point=current_time,
                     cell_ids=cell_ids,
                     store_attention=store_attention,
+                    ode_func=self.data_processor._create_ode_function(),
                     **method_kwargs
                 )
                 
@@ -365,7 +369,7 @@ class STAGEDTrainer:
             
             return {
                 'predictions': predictions,
-                'gene_names': self.genes,
+                'gene_names': self.data_processor.genes,
                 'time_points': torch.arange(initial_time, initial_time + prediction_steps, device=self.device),
                 'attention_weights': attention_weights if store_attention else None
             }

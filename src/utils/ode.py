@@ -48,16 +48,14 @@ def odeint_fixed(func: Callable,
         step_fn = _rk4_step
     elif method == 'midpoint':
         step_fn = _midpoint_step
-    
     else:
         raise ValueError(f"Unknown method: {method}")
     
     # Integration loop with fixed steps
-    y_current = y0
     for i in range(1, n_steps):
         t_current = t[i-1]
-        y_current = step_fn(func, t_current, y_current, dt)
-        solution[i] = y_current
+        y_current = solution[i-1]  # Use previous solution value
+        solution[i] = step_fn(func, t_current, y_current, dt)
     
     return solution
 
@@ -114,7 +112,7 @@ def odeint(func: Callable,
         raise NotImplementedError("Event functions not implemented in fixed-step version")
     
     if method is None:
-        method = 'dopri5'  # Default to RK4
+        method = 'rk4'  # Default to RK4
     
     if options is None:
         options = {}
