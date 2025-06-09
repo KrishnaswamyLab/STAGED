@@ -333,55 +333,7 @@ class DataProcessor:
         # Create batch
         return Batch.from_data_list(graphs)
 
-    def process_cell_data(
-        self,
-        cell_idx: int,
-        time_point: int,
-        gene_expression: torch.Tensor,
-        cell_positions: torch.Tensor,
-        delta_gl: int,
-        delta_lr: int,
-        delta_rg: int,
-        delta_gg: int
-    ) -> torch.Tensor:
-        """
-        Process single cell data into graph format.
-        
-        Args:
-            cell_idx: Index of the cell to process
-            time_point: Current time point
-            gene_expression: Gene expression tensor
-            cell_positions: Cell positions tensor
-            delta_gl: Time lag for gene-ligand connections
-            delta_lr: Time lag for ligand-receptor connections
-            delta_rg: Time lag for receptor-gene connections
-            delta_gg: Time lag for gene-gene connections
-            
-        Returns:
-            Processed graph data in PyG format
-        """
-        # Validate cell index
-        if cell_idx >= gene_expression.shape[1] or cell_idx < 0:
-            raise ValueError(f"Invalid cell_idx {cell_idx}. Must be between 0 and {gene_expression.shape[1]-1}")
-
-        # Check time point validity
-        min_required_time = max(delta_gl, delta_lr, delta_rg, delta_gg)
-        if time_point < min_required_time:
-            raise ValueError(
-                f"time_point {time_point} is too early. Need at least "
-                f"{min_required_time} time points of history for lags."
-            )
-
-        # Construct and process graph
-        base_graph = self.graph_constructor.construct_base_graph(cell_idx)
-        updated_graph = self.graph_constructor.update_graph_with_neighbors(
-            base_graph, cell_idx, cell_positions, time_point,
-            distance_threshold=self.distance_threshold
-        )
-        return self.graph_constructor.assign_node_features(
-            updated_graph, cell_idx, time_point, gene_expression,
-            delta_gl, delta_lr, delta_rg, delta_gg
-        ) 
+    
     def process_cell_data_ode(
         self,
         cell_idx: int,
@@ -433,11 +385,10 @@ class DataProcessor:
             dy_dt: Derivatives (n_cells * n_genes,)
         """
         # Determine number of cells from y shape
-        total_genes = y.shape[0]
-        n_cells = total_genes // self.num_genes
-        
-        if total_genes % self.num_genes != 0:
-            raise ValueError(f"State size {total_genes} not divisible by num_genes {self.num_genes}")
+        concatenated_genes = y.shape[0] # all genes concatenated
+        n_cells = concatenated_genes // self.num_genes
+        if concatenated_genes % self.num_genes != 0:
+            raise ValueError(f"State size {concatenated_genes} not divisible by num_genes {self.num_genes}")
         
         # Reshape y to (n_cells, n_genes)
         y_reshaped = y.view(n_cells, self.num_genes)
@@ -447,7 +398,7 @@ class DataProcessor:
         for cell_idx in range(n_cells):
             # Get current state for this cell
             current_y_for_cell = y_reshaped[cell_idx]
-            
+
             # Create graph with ODE features
             graph_data = self.process_cell_data_ode(
                 cell_idx=cell_idx,

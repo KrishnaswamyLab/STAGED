@@ -37,7 +37,6 @@ def ode_integration(func: Callable,
     # Preallocate solution tensor
     solution = torch.zeros(n_steps, *y0.shape, dtype=dtype, device=device)
     solution[0] = y0
-    
     # Choose integration method
     if method == 'euler':
         step_fn = _euler_step
