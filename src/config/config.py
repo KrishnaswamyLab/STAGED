@@ -42,7 +42,6 @@ class TrainingConfig:
     weight_decay: float = 1e-5
     patience: int = 10
     k_steps: int = 3  # for k_step mode
-    eval_times: str = "0.0,0.5,1.0,1.5"  # for ODE modes
     ode_method: str = "rk4"  # for ODE modes
 
 @dataclass
@@ -160,7 +159,6 @@ def save_config(config: Config, save_path: str) -> None:
             'weight_decay': config.training.weight_decay,
             'patience': config.training.patience,
             'k_steps': config.training.k_steps,
-            'eval_times': config.training.eval_times,
             'ode_method': config.training.ode_method,
         },
         'system': {

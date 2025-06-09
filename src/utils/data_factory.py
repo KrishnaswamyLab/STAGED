@@ -11,7 +11,7 @@ import networkx as nx
 from typing import Dict
 
 
-from src.utils.temporal_data_generator import create_oscillatory_dynamics_data, create_damped_oscillator_data,create_hex_grid_test_data,create_square_grid_data
+from src.utils.temporal_data_generator import create_oscillatory_dynamics_data, create_damped_oscillator_data #create_hex_grid_test_data,create_square_grid_data
 from src.utils.simulated_data_processing import retrieve_simulated_data,retrieve_real_data
 
 def create_simple_sinusoidal_data(

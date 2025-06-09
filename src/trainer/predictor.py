@@ -124,6 +124,8 @@ class STAGEDPredictor:
             self.model.delta_gg
         )
 
+        self.ode_func = self.data_processor.ode_func
+
     def save_predictions(
         self,
         predictions: InferenceOutput,
@@ -220,9 +222,7 @@ class STAGEDPredictor:
             
             # Get prediction method based on mode
             predict_method = (
-                self.model.predict_ode 
-                if self.config.training.prediction_mode == "ode" 
-                else self.model.predict
+                self.model.predict_ode
             )
             
             # Get method-specific kwargs
@@ -243,7 +243,7 @@ class STAGEDPredictor:
                     time_point=current_time,
                     cell_ids=cell_ids,
                     store_attention=store_attention,
-                    ode_func=self.data_processor._create_ode_function(),
+                    ode_func=self.ode_func,
                     **method_kwargs
                 )
                 

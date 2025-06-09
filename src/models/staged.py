@@ -6,7 +6,7 @@ from torch_geometric.data import Data, Batch
 from typing import Dict, List, Optional, Any, Tuple, Callable
 from dataclasses import dataclass
 from src.data.data_processor import ProcessedData
-from src.utils.ode import odeint_fixed
+from src.utils.ode import ode_integration
 
 @dataclass
 class PredictionOutput:
@@ -76,7 +76,8 @@ class STAGED(nn.Module):
     
     def forward(self, batch_data):
         """
-        Forward pass of the STAGED model
+        Forward pass of the STAGED model. 
+        This forward pass returns the node embeddings after the GAT layers and the attention weights from the last GAT layer.
         
         Args:
             batch_data: PyTorch Geometric Data or Batch object
@@ -123,71 +124,6 @@ class STAGED(nn.Module):
     def get_t_init(self):
         """Return the initial time steps needed before prediction can start"""
         return max(self.delta_gl, self.delta_lr, self.delta_rg, self.delta_gg)
-
-    def predict(
-        self,
-        data_processor,
-        data: Dict[str, Any],
-        time_point: int,
-        cell_ids: Optional[List[int]] = None,
-        store_attention: bool = False,
-        batch_size: int = 32
-    ) -> PredictionOutput:
-        """
-        Process raw data and generate predictions.
-        
-        Args:
-            data: ProcessedData object containing input data
-            time_point: Time point to predict for
-            cell_ids: Optional list of cell IDs to predict for
-            store_attention: Whether to store attention weights
-            
-        Returns:
-            PredictionOutput containing predictions and optional attention weights
-        """
-        self.eval()
-        with torch.no_grad():
-            # Get input data
-            gene_expression = data.gene_expression
-            
-            # If no cell_ids provided, predict for all cells
-            if cell_ids is None:
-                cell_ids = list(range(data.n_cells))
-            
-            # Initialize storage for predictions
-            predictions = []
-            attention_weights = [] if store_attention else None
-            
-            # Process each cell
-            for cell_idx in cell_ids:
-                # Process cell using data processor
-                cell_predictions, cell_attention = data.process_cell(
-                    gene_expression=gene_expression,
-                    cell_positions=data.cell_positions,
-                    time_point=time_point,
-                    cell_idx=cell_idx,
-                    delta_gl=self.delta_gl,
-                    delta_lr=self.delta_lr,
-                    delta_rg=self.delta_rg,
-                    delta_gg=self.delta_gg,
-                    store_attention=store_attention
-                )
-                
-                predictions.append(cell_predictions)
-                if store_attention and cell_attention is not None:
-                    attention_weights.append(cell_attention)
-            
-            # Stack predictions
-            predictions = torch.stack(predictions, dim=0)  # Shape: [n_cells, n_genes]
-            predictions = predictions.unsqueeze(0)  # Shape: [1, n_cells, n_genes]
-            
-            if store_attention and attention_weights:
-                attention_weights = torch.stack(attention_weights, dim=0)
-            
-            return PredictionOutput(
-                predictions=predictions,
-                attention_weights=attention_weights if store_attention else None
-            )
 
     def predict_ode(
         self,
@@ -258,7 +194,7 @@ class STAGED(nn.Module):
             time_span = torch.tensor([current_time, next_time], device=self.device)
             
             # Integrate ODE from current time to next time step
-            solution = odeint_fixed(
+            solution = ode_integration(
                 func=self.ode_func,
                 y0=initial_state,
                 t=time_span,

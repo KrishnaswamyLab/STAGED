@@ -39,7 +39,6 @@ training:
 
   # Mode-specific parameters
   k_steps: 3  # for k_step mode
-  eval_times: "0.0,0.5,1.0,1.5"  # for ODE modes
   ode_method: "rk4"  # for ODE modes
 
 # Inference Configuration

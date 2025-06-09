@@ -1,9 +1,8 @@
 import torch
-import torch.nn as nn
-from typing import Callable, Union, Optional, Tuple, Dict, Any
+from typing import Callable
 
 
-def odeint_fixed(func: Callable, 
+def ode_integration(func: Callable, 
                  y0: torch.Tensor, 
                  t: torch.Tensor, 
                  method: str = 'rk4',
@@ -31,8 +30,6 @@ def odeint_fixed(func: Callable,
     
     # Ensure t is sorted and on correct device
     t = t.to(device=device, dtype=dtype)
-    # if not torch.allclose(t[1:] - t[:-1], t[1] - t[0], rtol=1e-10):
-    #     raise ValueError("Time points must be evenly spaced for fixed-step integration")
     
     dt = t[1] - t[0]
     n_steps = len(t)
@@ -80,46 +77,6 @@ def _rk4_step(func: Callable, t: torch.Tensor, y: torch.Tensor, dt: torch.Tensor
     k4 = func(t + dt, y + dt * k3)
     return y + dt/6 * (k1 + 2*k2 + 2*k3 + k4)
 
-
-def odeint(func: Callable, 
-           y0: torch.Tensor, 
-           t: torch.Tensor, 
-           rtol: float = 1e-7,
-           atol: float = 1e-9,
-           method: Optional[str] = None,
-           options: Optional[Dict[str, Any]] = None,
-           event_fn: Optional[Callable] = None) -> torch.Tensor:
-    """
-    Reimplemented odeint that uses fixed time-stepping.
-    
-    This version avoids the "clever" adaptive stepping that can cause issues
-    when you need to match specific time resolutions (like MIOFlow output).
-    
-    Args:
-        func: ODE function dy/dt = func(t, y)
-        y0: Initial condition
-        t: Time points (should be evenly spaced)
-        rtol: Relative tolerance (for compatibility)
-        atol: Absolute tolerance (for compatibility) 
-        method: Integration method ('euler', 'rk4', 'midpoint','dopri5)
-        options: Additional options (for compatibility)
-        event_fn: Event function (not implemented in this version)
-        
-    Returns:
-        Solution tensor
-    """
-    if event_fn is not None:
-        raise NotImplementedError("Event functions not implemented in fixed-step version")
-    
-    if method is None:
-        method = 'rk4'  # Default to RK4
-    
-    if options is None:
-        options = {}
-    
-    return odeint_fixed(func, y0, t, method=method, rtol=rtol, atol=atol)
-
-
 # Example usage and test
 if __name__ == "__main__":
     # Test with a simple ODE: dy/dt = -y, y(0) = 1
@@ -133,7 +90,7 @@ if __name__ == "__main__":
     y0 = torch.tensor([1.0])
     
     # Solve using our fixed-step integrator
-    solution = odeint(simple_ode, y0, t, method='rk4')
+    solution = ode_integration(simple_ode, y0, t, method='rk4')
     
     # Compare with analytical solution
     analytical = torch.exp(-t).unsqueeze(1)

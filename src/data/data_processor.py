@@ -1,10 +1,9 @@
 import torch
-from typing import Dict, List, Any, Optional, Tuple
+from typing import Dict, List, Any, Optional, Tuple, NamedTuple
 from dataclasses import dataclass
 from torch_geometric.data import Data, Batch
 from src.utils.graph_constructor import GraphConstructor
 from src.utils.graph_data_handler import GraphDataHandler
-from src.utils.ode import odeint_fixed
 
 @dataclass
 class ProcessedData:
@@ -21,6 +20,14 @@ class ProcessedData:
     num_genes: int
 
 class DataProcessor:
+    ''''
+    Processes single-cell gene expression data into graph representations for gene regulatory network analysis.
+    
+    Converts gene expression, cell positions, and regulatory relationships into graph structures
+    that capture both intra-cellular gene regulation and inter-cellular communication through
+    ligand-receptor interactions.
+    '''
+
     def __init__(
         self,
         genes: List[str],
@@ -43,7 +50,8 @@ class DataProcessor:
         self.num_genes = len(genes)
         self.batch_size = batch_size
         self.model = model
-        # Initialize graph constructor
+        
+        # Initialize graph constructor and handler
         self.graph_constructor = GraphConstructor(
             genes=genes,
             ligand_receptor_pairs=ligand_receptor_pairs,
@@ -51,25 +59,14 @@ class DataProcessor:
             cell_type_assignments=cell_type_assignments,
             prior_grns=prior_grns
         )
-        
-        # Initialize graph handler
         self.graph_handler = GraphDataHandler(model, device=device)
         
-        # ODE-specific attributes (initialized when needed)
-        self._ode_func = None        # Create ODE function
+        # ODE-specific attributes
+        self._ode_func = None
         self.ode_integration_const = None
 
     def preprocess_data(self, data: Dict[str, torch.Tensor]) -> ProcessedData:
-        """
-        Preprocess raw data into model-ready format.
-        
-        Args:
-            data: Dictionary containing raw data tensors
-            
-        Returns:
-            ProcessedData object containing preprocessed data
-        """
-        # Move data to device
+        """Preprocess raw data into model-ready format."""
         processed_data = {
             k: v.to(self.device) if isinstance(v, torch.Tensor) else v
             for k, v in data.items()
@@ -117,9 +114,7 @@ class DataProcessor:
         """
         # Construct base graph
         base_graph = self.graph_constructor.construct_base_graph(cell_idx)
-        
-        # Update graph with neighbor connections
-        updated_graph = self.graph_constructor.update_graph_with_neighbors(
+        return self.graph_constructor.update_graph_with_neighbors(
             graph=base_graph,
             cell_idx=cell_idx,
             cell_positions=cell_positions,
@@ -424,59 +419,56 @@ class DataProcessor:
             self.model.delta_rg, self.model.delta_gg
         )
     
-    def _create_ode_function(self):
-        """Create the ODE function that will be used by torchdiffeq."""
 
-        def ode_func(t: float, y: torch.Tensor) -> torch.Tensor:
-            """
-            ODE function: dy/dt = f(t, y)
-            
-            Args:
-                t: Current time (float)
-                y: Current state (n_cells * n_genes,)
-                
-            Returns:
-                dy_dt: Derivatives (n_cells * n_genes,)
-            """
-            # Determine number of cells from y shape
-            total_genes = y.shape[0]
-            n_cells = total_genes // self.num_genes
-            
-            if total_genes % self.num_genes != 0:
-                raise ValueError(f"State size {total_genes} not divisible by num_genes {self.num_genes}")
-            
-            # Reshape y to (n_cells, n_genes)
-            y_reshaped = y.view(n_cells, self.num_genes)
-            
-            # Process each cell and collect derivatives
-            cell_graphs = []
-            for cell_idx in range(n_cells):
-                # Get current state for this cell
-                current_y_for_cell = y_reshaped[cell_idx]
-                
-                # Create graph with ODE features
-                graph_data = self.process_cell_data_ode(
-                    cell_idx=cell_idx,
-                    t=t,
-                    current_y_for_cell=current_y_for_cell,
-                    cell_positions=self._cell_positions  # Stored during predict_ode call
-                )
-                cell_graphs.append(graph_data.to(self.device))
-            
-            # Get derivatives from model
-            derivatives, attn, ptrs = self.graph_handler.process_cell_graphs(
-                cell_graphs=cell_graphs,
-                num_genes=self.num_genes,
-                batch_size=self.batch_size
-            )
-            
-            # Store attention weights and node pointers if storage exists
-            if hasattr(self, '_temp_attention_storage') and self._temp_attention_storage is not None:
-                self._temp_attention_storage.append(attn)
-            if hasattr(self, '_temp_pointer_storage') and self._temp_pointer_storage is not None:
-                self._temp_pointer_storage.append(ptrs)
-            
-            # Flatten back to original shape
-            return derivatives.view(-1)
+
+    def ode_func(self, t: float, y: torch.Tensor) -> torch.Tensor:
+        """
+        ODE function: dy/dt = f(t, y)
         
-        return ode_func
+        Args:
+            t: Current time (float)
+            y: Current state (n_cells * n_genes,)
+            
+        Returns:
+            dy_dt: Derivatives (n_cells * n_genes,)
+        """
+        # Determine number of cells from y shape
+        total_genes = y.shape[0]
+        n_cells = total_genes // self.num_genes
+        
+        if total_genes % self.num_genes != 0:
+            raise ValueError(f"State size {total_genes} not divisible by num_genes {self.num_genes}")
+        
+        # Reshape y to (n_cells, n_genes)
+        y_reshaped = y.view(n_cells, self.num_genes)
+        
+        # Process each cell and collect derivatives
+        cell_graphs = []
+        for cell_idx in range(n_cells):
+            # Get current state for this cell
+            current_y_for_cell = y_reshaped[cell_idx]
+            
+            # Create graph with ODE features
+            graph_data = self.process_cell_data_ode(
+                cell_idx=cell_idx,
+                t=t,
+                current_y_for_cell=current_y_for_cell,
+                cell_positions=self._cell_positions  # Stored during predict_ode call
+            )
+            cell_graphs.append(graph_data.to(self.device))
+        
+        # Get derivatives from model
+        derivatives, attn, ptrs = self.graph_handler.process_cell_graphs(
+            cell_graphs=cell_graphs,
+            num_genes=self.num_genes,
+            batch_size=self.batch_size
+        )
+        
+        # Store attention weights and node pointers if storage exists
+        if hasattr(self, '_temp_attention_storage') and self._temp_attention_storage is not None:
+            self._temp_attention_storage.append(attn)
+        if hasattr(self, '_temp_pointer_storage') and self._temp_pointer_storage is not None:
+            self._temp_pointer_storage.append(ptrs)
+        
+        # Flatten back to original shape
+        return derivatives.view(-1)

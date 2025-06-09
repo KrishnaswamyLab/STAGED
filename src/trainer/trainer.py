@@ -79,6 +79,7 @@ class STAGEDTrainer:
         # Process data
         self.processed_data = self.data_processor.preprocess_data(data)
         
+        self.ode_func = self.data_processor.ode_func
         
         # Initialize optimizer
         self.optimizer = torch.optim.Adam(
@@ -156,40 +157,11 @@ class STAGEDTrainer:
             self.best_model_path = best_model_path
             self.best_loss = loss
 
-    def load_checkpoint(self, checkpoint_path: str):
-        """
-        Load a model checkpoint.
-        
-        Args:
-            checkpoint_path: Path to the checkpoint file
-        """
-        if not os.path.exists(checkpoint_path):
-            raise FileNotFoundError(f"Checkpoint file not found at {checkpoint_path}")
-        
-        # Load checkpoint
-        checkpoint = torch.load(checkpoint_path, map_location=self.device, weights_only=False)
-        
-        # Load model state
-        self.model.load_state_dict(checkpoint['model_state_dict'])
-        
-        # Load optimizer state if available
-        if 'optimizer_state_dict' in checkpoint:
-            self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
-        
-        # Set model to eval mode
-        self.model.eval()
-        
-        print(f"Loaded checkpoint from {checkpoint_path}")
-
     def train_epoch(self):
         """Train for one epoch"""
         self.model.train()
-        total_loss = 0
         
-        if self.config.training.prediction_mode == "ode":
-            total_loss = self._train_ode_mode()
-        else:
-            total_loss = self._train_standard_mode()
+        total_loss = self._train_ode_mode()
             
         return total_loss
 
@@ -210,40 +182,11 @@ class STAGEDTrainer:
                 time_point=t,
                 method=self.config.training.ode_method if hasattr(self.config.training, 'ode_method') else 'rk4',
                 store_attention=False,
-                ode_func=self.data_processor._create_ode_function()
+                ode_func=self.ode_func
             )
             
             # Store prediction for current time point
             predictions[t - self.min_time] = output.predictions[0]
-        
-        # Compute loss
-        target = self.processed_data.gene_expression[self.min_time:].to(self.device)
-        return self.criterion(predictions, target)
-
-    def _train_standard_mode(self):
-        """Train using standard modes (one_step, k_step)"""
-        # Initialize prediction collection tensor
-        n_prediction_steps = self.processed_data.gene_expression.shape[0] - self.min_time
-        predictions = torch.zeros(
-            (n_prediction_steps, self.processed_data.n_cells, len(self.data_processor.genes)),
-            device=self.device
-        )
-
-        # Generate predictions for each time point
-        for t in range(self.min_time, self.processed_data.gene_expression.shape[0]):
-            # Get predictions for current time point
-            output = self.model.predict(
-                data=self.processed_data,
-                time_point=t
-            )
-            
-            if self.config.training.prediction_mode == "one_step":
-                # Store one-step prediction
-                predictions[t - self.min_time] = output.predictions
-            else:
-                raise NotImplementedError(
-                    f"Prediction mode {self.config.training.prediction_mode} not yet implemented"
-                )
         
         # Compute loss
         target = self.processed_data.gene_expression[self.min_time:].to(self.device)
