@@ -111,7 +111,7 @@ class STAGEDTrainer:
         config_path = os.path.join(self.checkpoint_dir, 'config.json')
         config_dict = {
             'data': {
-                'n_genes': len(self.data_processor.genes),
+                'n_genes': len(self.processed_data.genes),
                 'n_cells': self.processed_data.n_cells,
                 'n_time_points': self.processed_data.n_time_points,
             },
@@ -170,7 +170,7 @@ class STAGEDTrainer:
         # Initialize prediction collection tensor
         n_prediction_steps = self.processed_data.gene_expression.shape[0] - self.min_time
         predictions = torch.zeros(
-            (n_prediction_steps, self.processed_data.n_cells, len(self.data_processor.genes)),
+            (n_prediction_steps, self.processed_data.n_cells, len(self.processed_data.genes)),
             device=self.device
         )
         

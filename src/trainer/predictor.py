@@ -275,5 +275,5 @@ class STAGEDPredictor:
                 cell_type_filter=self.config.inference.cell_type_filter if hasattr(self.config.inference, 'cell_type_filter') else None,
                 prediction_mode=self.config.training.prediction_mode,
                 model_config=self.config.model,
-                genes=self.data_processor.genes
+                genes=self.processed_data.genes
             )
