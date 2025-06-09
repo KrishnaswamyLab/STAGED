@@ -42,7 +42,8 @@ class GraphConstructor:
         
     def construct_base_graph(self, cell_idx):
         """
-        Construct a base graph for a cell based on its cell type
+        Construct a base graph for a cell based on its cell type and prior GRN.
+        This function is adding the intercellular genes, receptors and ligands connections. 
         
         Args:
             cell_idx: Cell index in the tensor
@@ -52,23 +53,23 @@ class GraphConstructor:
         """
         # Get cell type from the 1D cell_type_assignments list or tensor
         cell_type = self.cell_type_assignments[cell_idx]
+
         # If cell_type_assignments is a tensor, convert to int or string as needed
         if isinstance(cell_type, torch.Tensor):
             cell_type = cell_type.item()
             
+        # Retrieve the prior GRN for the cell type
         base_grn = self.prior_grns[cell_type].copy()
-        # import pdb;pdb.set_trace()
         
         # Create a mapping from gene IDs to node indices in the graph
         node_mapping = {}
-        # import pdb;pdb.set_trace()
+
         # Add gene nodes first
         for gene_idx, gene in enumerate(self.genes):
             node_mapping[gene] = gene_idx
             if gene not in base_grn.nodes():
                 base_grn.add_node(gene)
-        # import pdb;pdb.set_trace()
-        
+
         # Add receptor nodes for receptor genes
         for gene in self.receptor_genes:
             receptor_node = f"r_{gene}"
@@ -263,7 +264,7 @@ class GraphConstructor:
         return pyg_graph
 
     def assign_node_features_ode(self, graph, cell_idx_in_dataset: int, current_ode_time_t: float,
-                                 current_y_for_cell: torch.Tensor,
+                                 gene_expression_history: torch.Tensor,
                                  delta_gl: int, delta_lr: int, delta_rg: int, delta_gg: int,
                                  device: torch.device = torch.device('cpu')):
         """
@@ -284,7 +285,6 @@ class GraphConstructor:
         Returns:
             graph_data: PyTorch Geometric Data object with node features
         """
-        #TODO: UNDERTAND HOW TO USE THE TIME LAGS IN ODE MODE
         node_features = {}
         gene_node_indices = []
         node_list = list(graph.nodes())

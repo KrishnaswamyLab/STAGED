@@ -86,100 +86,6 @@ class DataProcessor:
             num_genes=self.num_genes
         )
 
-    def process_cell(
-        self,
-        gene_expression: torch.Tensor,
-        cell_positions: torch.Tensor,
-        time_point: int,
-        cell_idx: int,
-        delta_gl: int,
-        delta_lr: int,
-        delta_rg: int,
-        delta_gg: int,
-        store_attention: bool = False
-    ) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
-        """
-        Process a single cell to get predictions.
-        
-        Args:
-            gene_expression: Historical gene expression data
-            cell_positions: Cell position data
-            time_point: Current time point
-            cell_idx: Index of the cell to process
-            delta_gl, delta_lr, delta_rg, delta_gg: Time lags
-            store_attention: Whether to store attention weights
-            
-        Returns:
-            Tuple of (predictions, attention_weights)
-        """
-        # Construct base graph
-        base_graph = self.graph_constructor.construct_base_graph(cell_idx)
-        return self.graph_constructor.update_graph_with_neighbors(
-            graph=base_graph,
-            cell_idx=cell_idx,
-            cell_positions=cell_positions,
-            time_point=time_point,
-            distance_threshold=self.distance_threshold
-        )
-        
-        # Assign node features
-        graph_data = self.graph_constructor.assign_node_features(
-            graph=updated_graph,
-            cell_idx=cell_idx,
-            time_point=time_point,
-            gene_expression_history=gene_expression,
-            delta_gl=delta_gl,
-            delta_lr=delta_lr,
-            delta_rg=delta_rg,
-            delta_gg=delta_gg
-        )
-        
-        # Use graph handler to get predictions
-        return self.graph_handler.process_graph(graph_data, store_attention)
-
-    def process_cell_ode(
-        self,
-        cell_idx: int,
-        current_ode_time_t: float,
-        current_y_for_cell: torch.Tensor,
-        delta_gl: int,
-        delta_lr: int,
-        delta_rg: int,
-        delta_gg: int,
-        store_attention: bool = False
-    ) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
-        """
-        Process a single cell in ODE mode.
-        
-        Args:
-            cell_idx: Index of the cell to process
-            current_ode_time_t: Current ODE time
-            current_y_for_cell: Current cell state
-            delta_gl, delta_lr, delta_rg, delta_gg: Time lags
-            store_attention: Whether to store attention weights
-            
-        Returns:
-            Tuple of (predictions, attention_weights)
-        """
-        # Construct base graph
-        base_graph = self.graph_constructor.construct_base_graph(cell_idx)
-        
-        # Assign node features for ODE mode
-        graph_data = self.graph_constructor.assign_node_features_ode(
-            graph=base_graph,
-            cell_idx_in_dataset=cell_idx,
-            current_ode_time_t=current_ode_time_t,
-            current_y_for_cell=current_y_for_cell,
-            delta_gl=delta_gl,
-            delta_lr=delta_lr,
-            delta_rg=delta_rg,
-            delta_gg=delta_gg,
-            device=self.device
-        )
-        
-        # Use graph handler to get predictions
-        return self.graph_handler.process_graph(graph_data, store_attention)
-
     def get_cell_neighbors(self, cell_positions: torch.Tensor) -> torch.Tensor:
         """
         Compute cell neighborhood relationships based on spatial positions.
@@ -200,59 +106,6 @@ class DataProcessor:
         adj.fill_diagonal_(0)
         
         return adj
-
-    def construct_graph(
-        self,
-        gene_expression: torch.Tensor,
-        cell_positions: torch.Tensor,
-        time_point: int,
-        cell_idx: int,
-        delta_gl: int,
-        delta_lr: int,
-        delta_rg: int,
-        delta_gg: int
-    ) -> Data:
-        """
-        Construct a graph for a specific cell and time point using the GraphConstructor.
-        
-        Args:
-            gene_expression: Tensor of shape (n_time_points, n_cells, n_genes)
-            cell_positions: Tensor of shape (n_time_points, n_cells, 2)
-            time_point: Current time point
-            cell_idx: Index of the cell to construct graph for
-            delta_gl: Time lag for gene-ligand connections
-            delta_lr: Time lag for ligand-receptor connections
-            delta_rg: Time lag for receptor-gene connections
-            delta_gg: Time lag for gene-gene connections
-            
-        Returns:
-            PyTorch Geometric Data object containing the graph
-        """
-        # Construct base graph
-        base_graph = self.graph_constructor.construct_base_graph(cell_idx)
-        
-        # Update graph with neighbor connections
-        updated_graph = self.graph_constructor.update_graph_with_neighbors(
-            graph=base_graph,
-            cell_idx=cell_idx,
-            cell_positions=cell_positions,
-            time_point=time_point,
-            distance_threshold=self.distance_threshold
-        )
-        
-        # Assign node features
-        graph_data = self.graph_constructor.assign_node_features(
-            graph=updated_graph,
-            cell_idx=cell_idx,
-            time_point=time_point,
-            gene_expression_history=gene_expression,
-            delta_gl=delta_gl,
-            delta_lr=delta_lr,
-            delta_rg=delta_rg,
-            delta_gg=delta_gg
-        )
-        
-        return graph_data
 
     def construct_graph_ode(
         self,
@@ -343,7 +196,7 @@ class DataProcessor:
   
     ) -> torch.Tensor:
         """
-        Process single cell data into graph format for ODE mode.
+        Process a single cell's data into graph format for ODE mode.
         
         Args:
             cell_idx: Index of the cell to process
@@ -360,8 +213,12 @@ class DataProcessor:
         
         # Use latest time point for cell positions
         latest_time_idx = cell_positions.shape[0] - 1
+
         updated_graph = self.graph_constructor.update_graph_with_neighbors(
-            base_graph, cell_idx, cell_positions, latest_time_idx,
+            base_graph, 
+            cell_idx,
+            cell_positions, 
+            latest_time_idx,
             distance_threshold=self.distance_threshold
         )
     
@@ -371,8 +228,6 @@ class DataProcessor:
             self.model.delta_rg, self.model.delta_gg
         )
     
-
-
     def ode_func(self, t: float, y: torch.Tensor) -> torch.Tensor:
         """
         ODE function: dy/dt = f(t, y)
@@ -396,6 +251,7 @@ class DataProcessor:
         # Process each cell and collect derivatives
         cell_graphs = []
         for cell_idx in range(n_cells):
+            
             # Get current state for this cell
             current_y_for_cell = y_reshaped[cell_idx]
 
