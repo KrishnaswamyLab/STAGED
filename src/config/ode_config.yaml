@@ -8,7 +8,7 @@ data:
   lr_pairs_data: "data/ligand_receptor_pairs.csv"
   cell_types_data: "data/cell_types.csv"
   prior_grns_data: "data/prior_grns.csv"
-  data_type: "oscillatory"  # or "hex_grid", "damped_oscillator"
+  data_type: "oscillatory"  # "simulated", "oscillatory" or "hex_grid", "damped_oscillator", 
   distance_threshold: 10.0
   validation_fraction: 0.2
   train_end_time: null
@@ -16,7 +16,7 @@ data:
 # Model Configuration
 model:
   hidden_dim: 64
-  num_gat_layers: 1
+  num_gat_layers: 1 # 1 for ODE mode
   num_mlp_layers: 3
   dropout: 0.1
   
@@ -50,7 +50,7 @@ inference:
 system:
   device: "auto"  # "auto", "cpu", "cuda", "mps"
   seed: 42
-  output_dir: "results"
+  output_dir: "results" # this will create the checkpoints folder
   visualize: false
 
 # Logging Configuration
