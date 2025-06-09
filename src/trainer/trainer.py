@@ -249,12 +249,6 @@ class STAGEDTrainer:
         target = self.processed_data.gene_expression[self.min_time:].to(self.device)
         return self.criterion(predictions, target)
 
-    def evaluate(self):
-        """Evaluate the model"""
-        self.model.eval()
-        with torch.no_grad():
-            return self.train_epoch()
-
     def fit(self):
         """Train the model"""
         loss_history = []
@@ -291,85 +285,3 @@ class STAGEDTrainer:
             best_model_path=self.best_model_path,
             checkpoint_dir=self.checkpoint_dir
         )
-
-    def inference(
-        self,
-        initial_time: int,
-        prediction_steps: int,
-        cell_ids: Optional[List[int]] = None,
-        store_attention: bool = False
-    ) -> Dict[str, torch.Tensor]:
-        """
-        Generate predictions for gene expression over time.
-        
-        Args:
-            initial_time: Starting time point for predictions
-            prediction_steps: Number of time steps to predict
-            cell_ids: Optional list of cell IDs to predict for. If None, predicts for all cells.
-            store_attention: Whether to store attention weights during prediction
-            
-        Returns:
-            Dictionary containing:
-                - predictions: Tensor of shape (prediction_steps, n_cells, n_genes)
-                - time_points: Tensor of shape (prediction_steps,)
-                - attention_weights: Optional tensor of attention weights if store_attention=True
-        """
-        self.model.eval()
-        with torch.no_grad():
-            # Initialize storage
-            predictions = []
-            attention_weights = [] if store_attention else None
-            
-            # Get prediction method based on mode
-            predict_method = (
-                self.model.predict_ode 
-                if self.config.training.prediction_mode == "ode" 
-                else self.model.predict
-            )
-            
-            # Get method-specific kwargs
-            method_kwargs = {}
-            if self.config.training.prediction_mode == "ode":
-                method_kwargs["method"] = (
-                    self.config.training.ode_method 
-                    if hasattr(self.config.training, 'ode_method') 
-                    else 'rk4'
-                )
-            
-            # Generate predictions one step at a time
-            current_time = initial_time
-            for _ in range(prediction_steps):
-                # Get prediction for current time point
-                output = predict_method(
-                    data=self.processed_data,
-                    time_point=current_time,
-                    cell_ids=cell_ids,
-                    store_attention=store_attention,
-                    ode_func=self.data_processor._create_ode_function(),
-                    **method_kwargs
-                )
-                
-                # Add time dimension to predictions if needed
-                pred = output.predictions
-                if self.config.training.prediction_mode != "ode":
-                    pred = pred.unsqueeze(0)
-                
-                predictions.append(pred)
-                
-                if store_attention and output.attention_weights is not None:
-                    attention_weights.append(output.attention_weights)
-                
-                current_time += 1
-            
-            # Stack predictions along time dimension
-            predictions = torch.cat(predictions, dim=0)  # Shape: (times, cells, genes)
-
-            if store_attention and attention_weights:
-                attention_weights = torch.stack(attention_weights, dim=0)
-            
-            return {
-                'predictions': predictions,
-                'gene_names': self.data_processor.genes,
-                'time_points': torch.arange(initial_time, initial_time + prediction_steps, device=self.device),
-                'attention_weights': attention_weights if store_attention else None
-            }

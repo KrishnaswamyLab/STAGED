@@ -63,6 +63,7 @@ class LoggingConfig:
 class InferenceConfig:
     """Inference configuration settings"""
     store_attention: bool = True
+    output_dir: str = "results"
 
 @dataclass
 class Config:
@@ -174,6 +175,7 @@ def save_config(config: Config, save_path: str) -> None:
         },
         'inference': {
             'store_attention': config.inference.store_attention,
+            'output_dir': config.inference.output_dir,
         }
     }
     

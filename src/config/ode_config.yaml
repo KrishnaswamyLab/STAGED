@@ -45,6 +45,7 @@ training:
 # Inference Configuration
 inference:
   store_attention: false
+  output_dir: "results/ode/rk4"
 
 # System Configuration
 system:

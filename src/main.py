@@ -8,13 +8,11 @@ with different prediction modes and data types.
 Usage:
     python main.py --mode train --config config/train_config.yaml
     python main.py --mode eval --config config/eval_config.yaml
-    python main.py --mode predict --config config/predict_config.yaml
 """
 
 import argparse
 import torch
 
-from trainer.predictor import save_predictions, InferenceOutput, print_inference_summary
 from config.config import load_config
 from utils.data_factory import get_data
 from trainer.trainer import STAGEDTrainer
@@ -25,9 +23,9 @@ def parse_args():
     
     # Core arguments
     parser.add_argument('--mode', 
-                       choices=['train', 'eval', 'inference'], 
+                       choices=['train', 'eval'], 
                        required=True,
-                       help='Operation mode: train model, evaluate model, or make predictions')
+                       help='Operation mode: train model or evaluate model')
     
     parser.add_argument('--config', 
                        type=str, 
@@ -50,34 +48,8 @@ def parse_args():
                        type=int, 
                        default=None,
                        help='Override random seed from config')
-    
-    # Prediction-specific arguments
-    parser.add_argument('--initial_time',
-                       type=int,
-                       default=None,
-                       help='Initial time point for predictions')
-    
-    parser.add_argument('--prediction_steps',
-                       type=int,
-                       default=None,
-                       help='Number of time steps to predict')
-    
-    parser.add_argument('--checkpoint_path',
-                       type=str,
-                       default=None,
-                       help='Path to model checkpoint. Required for inference mode.')
-    
-    parser.add_argument('--cell_type_id',
-                       type=int,
-                       default=None,
-                       help='ID of the cell type to perform inference on')
 
     args = parser.parse_args()
-    
-    # Validate arguments based on mode
-    if args.mode == 'inference' and args.checkpoint_path is None:
-        parser.error("--checkpoint_path is required for inference mode")
-    
     return args
 
 def setup_environment(config, args):
@@ -112,7 +84,7 @@ def main():
     # Get data using the data factory
     data = get_data(config.data.data_type, config.system.device)
     
-    # Initialize trainer (this is used for training and inference.)
+    # Initialize trainer
     trainer = STAGEDTrainer(
         data=data,
         genes=data['genes'],
@@ -128,50 +100,6 @@ def main():
         training_output = trainer.fit()
         print(f"\nBest model saved to: {training_output.best_model_path}")
 
-    elif args.mode == 'inference':
-        # Load the specified model checkpoint
-        trainer.load_checkpoint(args.checkpoint_path)
-        
-        ## Get prediction parameters
-        # Ensure we have enough history for model lags
-        min_time = max(trainer.model.delta_gl, trainer.model.delta_lr, trainer.model.delta_rg, trainer.model.delta_gg)
-        initial_time = args.initial_time if args.initial_time is not None else min_time
-        initial_time = max(initial_time, min_time)
-
-        prediction_steps = args.prediction_steps if args.prediction_steps is not None else 10
-        
-        # Run prediction
-        predictions = trainer.inference(
-            initial_time=initial_time,
-            prediction_steps=prediction_steps,
-            store_attention=config.inference.store_attention if hasattr(config.inference, 'store_attention') else False
-        )
-        
-        # Create InferenceOutput object
-        inference_output = InferenceOutput(
-            predictions=predictions['predictions'],
-            attention_weights=predictions['attention_weights'],
-            time_points=predictions['time_points'].tolist(),
-            cell_type_filter=args.cell_type_id,
-            prediction_mode=config.training.prediction_mode,
-            model_config=config.model,
-            genes=config.data.genes if hasattr(config.data, 'genes') else None
-        )
-        
-        # Save predictions
-        output_path = save_predictions(
-            predictions=predictions,
-            config=config,
-            initial_time=initial_time,
-            prediction_steps=prediction_steps,
-            model_path=args.checkpoint_path
-        )
-        
-        # Print summary
-        print_inference_summary(inference_output)
-        
-        print(f"\nPredictions saved to: {output_path}")
-        
     ##TODO: Implement evaluation mode
     # elif args.mode == 'eval':
     #     trainer, _ = initialize_trainer(config, args.checkpoint_path)

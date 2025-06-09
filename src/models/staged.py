@@ -37,6 +37,9 @@ class STAGED(nn.Module):
     ):
         super(STAGED, self).__init__()
         
+        self.num_gat_layers = num_gat_layers
+        self.num_mlp_layers = num_mlp_layers
+        self.dropout = dropout
         self.num_genes = num_genes
         self.hidden_dim = hidden_dim
         self.delta_gl = delta_gl
