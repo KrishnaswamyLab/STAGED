@@ -65,6 +65,19 @@ class DataProcessor:
         self._ode_func = None
         self.ode_integration_const = None
 
+        if not genes:
+            raise ValueError("Empty genes list provided to DataProcessor")
+        if not isinstance(genes, list):
+            raise ValueError(f"genes must be a list, got {type(genes)}")
+    
+        print(f"DataProcessor initialized with {len(genes)} genes")
+        self.genes = genes
+        self.num_genes = len(genes)
+    
+        if self.num_genes == 0:
+            raise ValueError("num_genes is 0 after initialization")
+
+
     def preprocess_data(self, data: Dict[str, torch.Tensor]) -> ProcessedData:
         """Preprocess raw data into model-ready format."""
         processed_data = {
@@ -239,6 +252,8 @@ class DataProcessor:
         Returns:
             dy_dt: Derivatives (n_cells * n_genes,)
         """
+        if self.num_genes == 0:
+            raise ValueError(f"num_genes is 0! Check genes initialization. Current genes: {getattr(self, 'genes', 'NOT SET')}")
         # Determine number of cells from y shape
         concatenated_genes = y.shape[0] # all genes concatenated
         n_cells = concatenated_genes // self.num_genes

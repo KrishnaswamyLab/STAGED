@@ -8,7 +8,7 @@ data:
   lr_pairs_data: "data/ligand_receptor_pairs.csv"
   cell_types_data: "data/cell_types.csv"
   prior_grns_data: "data/prior_grns.csv"
-  data_type: "oscillatory"  # "simulated", "oscillatory" or "hex_grid", "damped_oscillator", 
+  data_type: "simulated"  # or "hex_grid", "damped_oscillator", "oscillatory"
   distance_threshold: 10.0
   validation_fraction: 0.2
   train_end_time: null

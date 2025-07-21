@@ -264,7 +264,7 @@ class GraphConstructor:
         return pyg_graph
 
     def assign_node_features_ode(self, graph, cell_idx_in_dataset: int, current_ode_time_t: float,
-                                 current_y_for_cell,
+                                 current_y_for_cell:torch.Tensor, #gene_expression_history: torch.Tensor,
                                  delta_gl: int, delta_lr: int, delta_rg: int, delta_gg: int,
                                  device: torch.device = torch.device('cpu')):
         """

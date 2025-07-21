@@ -63,6 +63,31 @@ def retrieve_simulated_data(data_dir="data/raw",sim_file="simulation_results.pkl
     data['receptor_gene_pairs'] = metadata['receptor_gene_pairs']
     data['ligand_receptor_pairs'] = metadata['ligand_receptor_pairs']
 
+    valid_genes = set(data['genes'])
+    print(f"Valid genes in simulation: {sorted(valid_genes)}")
+
+    original_lr_pairs = data['ligand_receptor_pairs']
+    filtered_lr_pairs = []
+    for ligand, receptor in original_lr_pairs:
+        if ligand in valid_genes and receptor in valid_genes:
+            filtered_lr_pairs.append((ligand, receptor))
+        else:
+            print(f"Removing invalid L-R pair: ({ligand}, {receptor})")
+
+    data['ligand_receptor_pairs'] = filtered_lr_pairs
+
+    # Filter receptor_gene_pairs to only include existing genes  
+    original_rg_pairs = data['receptor_gene_pairs']
+    filtered_rg_pairs = []
+    for receptor, gene in original_rg_pairs:
+        if receptor in valid_genes and gene in valid_genes:
+            filtered_rg_pairs.append((receptor, gene))
+        else:
+            print(f"Removing invalid R-G pair: ({receptor}, {gene})")
+
+    data['receptor_gene_pairs'] = filtered_rg_pairs
+
+
      # Calculate dimensions
     data['n_time_points'] = data['gene_expression'].shape[0]
     data['n_cells'] = data['gene_expression'].shape[1]

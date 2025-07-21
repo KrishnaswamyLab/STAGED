@@ -9,16 +9,120 @@ import torch
 from typing import Dict, Optional
 from datetime import datetime
 
+# def visualize_graph(graph, title, output_dir='results', save_plot=False, show_plot=True, figsize=(10, 10), return_pos=False):
+#     """
+#     Visualize a NetworkX graph with node types shown in different colors
+    
+#     Args:
+#         graph: NetworkX graph to visualize
+#         title: Title for the plot
+#         output_dir: Directory to save the visualization
+#         save_plot: Whether to save the plot to file (default: True)
+#         show_plot: Whether to display the plot (default: False)
+#     """
+#     plt.figure(figsize=figsize)
+    
+#     # Group nodes by type
+#     gene_nodes = [n for n, d in graph.nodes(data=True) if d.get('type', 'gene') == 'gene']
+#     receptor_nodes = [n for n, d in graph.nodes(data=True) if d.get('type') == 'receptor']
+#     ligand_nodes = [n for n, d in graph.nodes(data=True) if d.get('type') == 'ligand']
+#     input_ligand_nodes = [n for n, d in graph.nodes(data=True) if d.get('type') == 'input_ligand']
+    
+#     # Create positions for the graph layout
+#     pos = {}
+    
+#     # Position gene nodes in a circle at the bottom
+#     gene_pos = nx.circular_layout(nx.Graph([(g, g2) for g in gene_nodes for g2 in gene_nodes if g != g2]))
+#     gene_pos = {k: (v[0], v[1] - 0.5) for k, v in gene_pos.items()}
+#     pos.update(gene_pos)
+    
+#     # Position receptor nodes above genes
+#     receptor_pos = nx.circular_layout(nx.Graph([(r, r2) for r in receptor_nodes for r2 in receptor_nodes if r != r2]))
+#     receptor_pos = {k: (v[0], v[1] + 0.0) for k, v in receptor_pos.items()}
+#     pos.update(receptor_pos)
+    
+#     # Position ligand nodes above receptors
+#     ligand_pos = nx.circular_layout(nx.Graph([(l, l2) for l in ligand_nodes for l2 in ligand_nodes if l != l2]))
+#     ligand_pos = {k: (v[0], v[1] + 0.5) for k, v in ligand_pos.items()}
+#     pos.update(ligand_pos)
+    
+#         # Position ligand nodes above receptors
+#     ligand_pos = nx.circular_layout(nx.Graph([(l, l2) for l in input_ligand_nodes for l2 in input_ligand_nodes if l != l2]))
+#     ligand_pos = {k: (v[0], v[1] + 0.5) for k, v in ligand_pos.items()}
+#     pos.update(ligand_pos)
+
+#     # # Position input ligand nodes to the right
+#     # for i, node in enumerate(input_ligand_nodes):
+#     #     # Extract cell and gene info from the node name
+#     #     cell = graph.nodes[node].get('cell')
+#     #     gene = graph.nodes[node].get('gene')
+#         # Position based on cell ID (horizontal spread) and gene (vertical position)
+#         # pos[node] = (1.5 + int(cell) * 0.6, -0.3 + int(gene.split('_')[1]) * 0.3)
+    
+#     # Draw the nodes with different colors by type
+#     nx.draw_networkx_nodes(graph, pos, nodelist=gene_nodes, node_color='lightblue', 
+#                           node_size=500, label='Genes')
+#     nx.draw_networkx_nodes(graph, pos, nodelist=receptor_nodes, node_color='lightgreen', 
+#                           node_size=500, label='Receptors')
+#     nx.draw_networkx_nodes(graph, pos, nodelist=ligand_nodes, node_color='orange', 
+#                           node_size=500, label='Ligands')
+#     nx.draw_networkx_nodes(graph, pos, nodelist=input_ligand_nodes, node_color='salmon', 
+#                           node_size=500, label='Input Ligands')
+    
+#     # Draw edges with different colors by type
+#     gene_to_gene_edges = [(u, v) for u, v in graph.edges() 
+#                          if u in gene_nodes and v in gene_nodes]
+#     gene_to_ligand_edges = [(u, v) for u, v in graph.edges() 
+#                            if u in gene_nodes and v in ligand_nodes]
+#     input_ligand_to_receptor_edges = [(u, v) for u, v in graph.edges() 
+#                                      if u in input_ligand_nodes and v in receptor_nodes]
+#     receptor_to_gene_edges = [(u, v) for u, v in graph.edges() 
+#                              if u in receptor_nodes and v in gene_nodes]
+#     other_edges = [(u, v) for u, v in graph.edges() 
+#                   if (u, v) not in gene_to_gene_edges + gene_to_ligand_edges + 
+#                      input_ligand_to_receptor_edges + receptor_to_gene_edges]
+    
+#     nx.draw_networkx_edges(graph, pos, edgelist=gene_to_gene_edges, 
+#                           edge_color='blue', width=1.0, alpha=0.7)
+#     nx.draw_networkx_edges(graph, pos, edgelist=gene_to_ligand_edges, 
+#                           edge_color='orange', width=1.0, alpha=0.7)
+#     nx.draw_networkx_edges(graph, pos, edgelist=input_ligand_to_receptor_edges, 
+#                           edge_color='red', width=1.0, alpha=0.7)
+#     nx.draw_networkx_edges(graph, pos, edgelist=receptor_to_gene_edges, 
+#                           edge_color='green', width=1.0, alpha=0.7)
+#     nx.draw_networkx_edges(graph, pos, edgelist=other_edges, 
+#                           edge_color='gray', width=1.0, alpha=0.5)
+    
+#     # Draw node labels
+#     nx.draw_networkx_labels(graph, pos, font_size=8)
+    
+#     # Add legend, title, and other formatting
+#     plt.title(title)
+#     plt.legend()
+#     plt.axis('off')
+#     plt.tight_layout()
+    
+#     # Save and/or show the plot
+#     if save_plot:
+#         # Create output directory if it doesn't exist
+#         os.makedirs(output_dir, exist_ok=True)
+        
+#         # Save the figure
+#         output_file = os.path.join(output_dir, f"{title.replace(' ', '_')}.png")
+#         plt.savefig(output_file, dpi=300, bbox_inches='tight')
+#         print(f"Saved graph visualization to {output_file}")
+    
+#     if show_plot:
+#         plt.show()
+#     else:
+#         plt.close()
+    
+#     if return_pos:
+#         return pos
+
 def visualize_graph(graph, title, output_dir='results', save_plot=False, show_plot=True, figsize=(10, 10), return_pos=False):
     """
     Visualize a NetworkX graph with node types shown in different colors
-    
-    Args:
-        graph: NetworkX graph to visualize
-        title: Title for the plot
-        output_dir: Directory to save the visualization
-        save_plot: Whether to save the plot to file (default: True)
-        show_plot: Whether to display the plot (default: False)
     """
     plt.figure(figsize=figsize)
     
@@ -28,46 +132,57 @@ def visualize_graph(graph, title, output_dir='results', save_plot=False, show_pl
     ligand_nodes = [n for n, d in graph.nodes(data=True) if d.get('type') == 'ligand']
     input_ligand_nodes = [n for n, d in graph.nodes(data=True) if d.get('type') == 'input_ligand']
     
+    # Get all nodes to ensure we position everything
+    all_nodes = list(graph.nodes())
+    
     # Create positions for the graph layout
     pos = {}
     
-    # Position gene nodes in a circle at the bottom
-    gene_pos = nx.circular_layout(nx.Graph([(g, g2) for g in gene_nodes for g2 in gene_nodes if g != g2]))
-    gene_pos = {k: (v[0], v[1] - 0.5) for k, v in gene_pos.items()}
-    pos.update(gene_pos)
+    # Start with a spring layout for all nodes as a fallback
+    fallback_pos = nx.spring_layout(graph, k=1, iterations=50)
+    pos.update(fallback_pos)
     
-    # Position receptor nodes above genes
-    receptor_pos = nx.circular_layout(nx.Graph([(r, r2) for r in receptor_nodes for r2 in receptor_nodes if r != r2]))
-    receptor_pos = {k: (v[0], v[1] + 0.0) for k, v in receptor_pos.items()}
-    pos.update(receptor_pos)
+    # Then customize positions for specific node types if they exist
+    if gene_nodes:
+        gene_pos = nx.circular_layout(graph.subgraph(gene_nodes))
+        gene_pos = {k: (v[0], v[1] - 0.5) for k, v in gene_pos.items()}
+        pos.update(gene_pos)
     
-    # Position ligand nodes above receptors
-    ligand_pos = nx.circular_layout(nx.Graph([(l, l2) for l in ligand_nodes for l2 in ligand_nodes if l != l2]))
-    ligand_pos = {k: (v[0], v[1] + 0.5) for k, v in ligand_pos.items()}
-    pos.update(ligand_pos)
+    if receptor_nodes:
+        receptor_pos = nx.circular_layout(graph.subgraph(receptor_nodes))
+        receptor_pos = {k: (v[0], v[1] + 0.0) for k, v in receptor_pos.items()}
+        pos.update(receptor_pos)
     
-        # Position ligand nodes above receptors
-    ligand_pos = nx.circular_layout(nx.Graph([(l, l2) for l in input_ligand_nodes for l2 in input_ligand_nodes if l != l2]))
-    ligand_pos = {k: (v[0], v[1] + 0.5) for k, v in ligand_pos.items()}
-    pos.update(ligand_pos)
-
-    # # Position input ligand nodes to the right
-    # for i, node in enumerate(input_ligand_nodes):
-    #     # Extract cell and gene info from the node name
-    #     cell = graph.nodes[node].get('cell')
-    #     gene = graph.nodes[node].get('gene')
-        # Position based on cell ID (horizontal spread) and gene (vertical position)
-        # pos[node] = (1.5 + int(cell) * 0.6, -0.3 + int(gene.split('_')[1]) * 0.3)
+    if ligand_nodes:
+        ligand_pos = nx.circular_layout(graph.subgraph(ligand_nodes))
+        ligand_pos = {k: (v[0], v[1] + 0.5) for k, v in ligand_pos.items()}
+        pos.update(ligand_pos)
+    
+    if input_ligand_nodes:
+        input_ligand_pos = nx.circular_layout(graph.subgraph(input_ligand_nodes))
+        input_ligand_pos = {k: (v[0] + 1.5, v[1] + 0.5) for k, v in input_ligand_pos.items()}
+        pos.update(input_ligand_pos)
+    
+    # Ensure all nodes have positions
+    missing_nodes = [n for n in all_nodes if n not in pos]
+    if missing_nodes:
+        print(f"Warning: Adding fallback positions for nodes: {missing_nodes}")
+        for i, node in enumerate(missing_nodes):
+            pos[node] = (2.0, i * 0.3)  # Position missing nodes to the right
     
     # Draw the nodes with different colors by type
-    nx.draw_networkx_nodes(graph, pos, nodelist=gene_nodes, node_color='lightblue', 
-                          node_size=500, label='Genes')
-    nx.draw_networkx_nodes(graph, pos, nodelist=receptor_nodes, node_color='lightgreen', 
-                          node_size=500, label='Receptors')
-    nx.draw_networkx_nodes(graph, pos, nodelist=ligand_nodes, node_color='orange', 
-                          node_size=500, label='Ligands')
-    nx.draw_networkx_nodes(graph, pos, nodelist=input_ligand_nodes, node_color='salmon', 
-                          node_size=500, label='Input Ligands')
+    if gene_nodes:
+        nx.draw_networkx_nodes(graph, pos, nodelist=gene_nodes, node_color='lightblue', 
+                              node_size=500, label='Genes')
+    if receptor_nodes:
+        nx.draw_networkx_nodes(graph, pos, nodelist=receptor_nodes, node_color='lightgreen', 
+                              node_size=500, label='Receptors')
+    if ligand_nodes:
+        nx.draw_networkx_nodes(graph, pos, nodelist=ligand_nodes, node_color='orange', 
+                              node_size=500, label='Ligands')
+    if input_ligand_nodes:
+        nx.draw_networkx_nodes(graph, pos, nodelist=input_ligand_nodes, node_color='salmon', 
+                              node_size=500, label='Input Ligands')
     
     # Draw edges with different colors by type
     gene_to_gene_edges = [(u, v) for u, v in graph.edges() 
@@ -82,16 +197,21 @@ def visualize_graph(graph, title, output_dir='results', save_plot=False, show_pl
                   if (u, v) not in gene_to_gene_edges + gene_to_ligand_edges + 
                      input_ligand_to_receptor_edges + receptor_to_gene_edges]
     
-    nx.draw_networkx_edges(graph, pos, edgelist=gene_to_gene_edges, 
-                          edge_color='blue', width=1.0, alpha=0.7)
-    nx.draw_networkx_edges(graph, pos, edgelist=gene_to_ligand_edges, 
-                          edge_color='orange', width=1.0, alpha=0.7)
-    nx.draw_networkx_edges(graph, pos, edgelist=input_ligand_to_receptor_edges, 
-                          edge_color='red', width=1.0, alpha=0.7)
-    nx.draw_networkx_edges(graph, pos, edgelist=receptor_to_gene_edges, 
-                          edge_color='green', width=1.0, alpha=0.7)
-    nx.draw_networkx_edges(graph, pos, edgelist=other_edges, 
-                          edge_color='gray', width=1.0, alpha=0.5)
+    if gene_to_gene_edges:
+        nx.draw_networkx_edges(graph, pos, edgelist=gene_to_gene_edges, 
+                              edge_color='blue', width=1.0, alpha=0.7)
+    if gene_to_ligand_edges:
+        nx.draw_networkx_edges(graph, pos, edgelist=gene_to_ligand_edges, 
+                              edge_color='orange', width=1.0, alpha=0.7)
+    if input_ligand_to_receptor_edges:
+        nx.draw_networkx_edges(graph, pos, edgelist=input_ligand_to_receptor_edges, 
+                              edge_color='red', width=1.0, alpha=0.7)
+    if receptor_to_gene_edges:
+        nx.draw_networkx_edges(graph, pos, edgelist=receptor_to_gene_edges, 
+                              edge_color='green', width=1.0, alpha=0.7)
+    if other_edges:
+        nx.draw_networkx_edges(graph, pos, edgelist=other_edges, 
+                              edge_color='gray', width=1.0, alpha=0.5)
     
     # Draw node labels
     nx.draw_networkx_labels(graph, pos, font_size=8)
@@ -104,10 +224,7 @@ def visualize_graph(graph, title, output_dir='results', save_plot=False, show_pl
     
     # Save and/or show the plot
     if save_plot:
-        # Create output directory if it doesn't exist
         os.makedirs(output_dir, exist_ok=True)
-        
-        # Save the figure
         output_file = os.path.join(output_dir, f"{title.replace(' ', '_')}.png")
         plt.savefig(output_file, dpi=300, bbox_inches='tight')
         print(f"Saved graph visualization to {output_file}")
@@ -119,6 +236,7 @@ def visualize_graph(graph, title, output_dir='results', save_plot=False, show_pl
     
     if return_pos:
         return pos
+
 
 
 def visualize_attention_graph(pyg_graph, edge_index, attention_weights, pos, figsize=(12, 10), show_labels=True):
