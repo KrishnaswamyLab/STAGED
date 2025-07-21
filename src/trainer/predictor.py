@@ -67,7 +67,7 @@ class STAGEDPredictor:
             if not os.path.exists(checkpoint_path):
                 raise FileNotFoundError(f"Checkpoint file not found at {checkpoint_path}")
             
-            checkpoint = torch.load(checkpoint_path, map_location=self.device)
+            checkpoint = torch.load(checkpoint_path, map_location=self.device, weights_only=False)
             if 'config' in checkpoint:
                 # Use configuration from checkpoint
                 model_config = checkpoint['config'].model

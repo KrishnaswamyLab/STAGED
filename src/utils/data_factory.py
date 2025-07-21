@@ -143,7 +143,7 @@ def get_data(data_type: str, device: torch.device) -> Dict:
     
     elif data_type== "simulated":
         print("Retriving simulated data...")
-        data = retrieve_simulated_data(data_dir="data/raw",sim_file="100_simulation_results.pkl")
+        data = retrieve_simulated_data(data_dir="/gpfs/gibbs/pi/krishnaswamy_smita/kx44/projects/STAGED-Simulator/src/staged_simulator/tests/outputs",sim_file="50_simulation_results.pkl")
         # Convert to device
         for key, value in data.items():
             print(f"Converting {key} to device {device}")
