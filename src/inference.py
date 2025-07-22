@@ -11,8 +11,8 @@ Usage:
 import argparse
 import torch
 
-from src.config.config import load_config
-from src.utils.data_factory import get_data
+from config.config import load_config
+from utils.data_factory import get_data
 from trainer.predictor import STAGEDPredictor,print_inference_summary
 
 def parse_args():

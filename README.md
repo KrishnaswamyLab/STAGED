@@ -6,6 +6,23 @@
 
 Spatio Temporal Agent-Based Graph Evolution Dynamics (STAGED)
 
+## 🛠️ Installation
+
+This project uses [uv](https://docs.astral.sh/uv/) to manage dependencies. To set up the project locally:
+
+1. **Install dependencies**:
+
+    ```bash
+    uv sync  # Creates a virtual environment and installs dependencies
+    ```
+
+2. **Activate the virtual environment**:
+
+    ```bash
+    source .venv/bin/activate
+    ```
+---
+
 ## Project Organization
 
 ```

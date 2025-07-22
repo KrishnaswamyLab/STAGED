@@ -1,35 +1,22 @@
-[build-system]
-requires = ["flit_core >=3.2,<4"]
-build-backend = "flit_core.buildapi"
-
 [project]
 name = "staged"
-version = "0.0.1"
-description = "Spatial Temporal Agent-Based Graph Evolution Dynamics (STAGED)"
-authors = [
-  { name = "Krishnaswamy Lab" },
-]
-
+version = "0.1.0"
+description = "Add your description here"
 readme = "README.md"
-classifiers = [
-    "Programming Language :: Python :: 3",
-    
-]
-requires-python = "~=3.10"
-
-[tool.black]
-line-length = 99
-include = '\.pyi?$'
-exclude = '''
-/(
-    \.git
-  | \.venv
-)/
-'''
-
-[tool.isort]
-profile = "black"
-known_first_party = ["staged"]
-force_sort_within_sections = true
-
-
+requires-python = ">=3.12"
+dependencies = [
+    "numpy",
+    "pandas",
+    "scikit-learn",
+    "matplotlib",
+    "seaborn",
+    "jupyter",
+    "ipykernel",
+    "ipywidgets",
+    "tqdm",
+    "torch>=2.7.0",
+    "torchvision>=0.22.0",
+    "lightning>=2.0,<3.0",
+    "torch-geometric",
+    "torchdiffeq",
+    "anndata"]

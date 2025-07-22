@@ -5,8 +5,8 @@ from torch_geometric.nn import GATConv
 from torch_geometric.data import Data, Batch
 from typing import Dict, List, Optional, Any, Tuple, Callable
 from dataclasses import dataclass
-from src.data.data_processor import ProcessedData
-from src.utils.ode import ode_integration
+from data.data_processor import ProcessedData
+from utils.ode import ode_integration
 
 @dataclass
 class PredictionOutput:

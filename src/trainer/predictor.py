@@ -6,9 +6,9 @@ import os
 from datetime import datetime
 import pickle
 
-from src.models.staged import STAGED
-from src.data.data_processor import DataProcessor
-from src.config.config import Config
+from models.staged import STAGED
+from data.data_processor import DataProcessor
+from config.config import Config
 
 @dataclass
 class InferenceOutput:

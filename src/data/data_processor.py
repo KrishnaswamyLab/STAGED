@@ -2,8 +2,8 @@ import torch
 from typing import Dict, List, Any, Optional, Tuple, NamedTuple
 from dataclasses import dataclass
 from torch_geometric.data import Data, Batch
-from src.utils.graph_constructor import GraphConstructor
-from src.utils.graph_data_handler import GraphDataHandler
+from utils.graph_constructor import GraphConstructor
+from utils.graph_data_handler import GraphDataHandler
 
 @dataclass
 class ProcessedData:
