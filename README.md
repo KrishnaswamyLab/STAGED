@@ -22,6 +22,11 @@ This project uses [uv](https://docs.astral.sh/uv/) to manage dependencies. To se
     source .venv/bin/activate
     ```
 ---
+## Example of a main run
+
+    ```bash
+    python src/main.py --mode train --config src/config/ode_config.yaml
+    ```
 
 ## Project Organization
 

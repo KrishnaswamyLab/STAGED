@@ -10,6 +10,7 @@ data:
   cell_types_data: "data/cell_types.csv"
   prior_grns_data: "data/prior_grns.csv"
   data_type: "simulated"  # or "hex_grid", "damped_oscillator", "oscillatory"
+  sim_file: "raw/50_simulation_results.pkl"
   distance_threshold: 10.0
   validation_fraction: 0.2
   train_end_time: null

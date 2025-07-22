@@ -15,6 +15,7 @@ class DataConfig:
     cell_types_data: str = "data/cell_types.csv"
     prior_grns_data: str = "data/prior_grns.csv"
     data_type: str = "oscillatory"  # or "hex_grid", "damped_oscillator"
+    sim_file: str = "100_simulation_results.pkl"
     distance_threshold: float = 10.0
     validation_fraction: float = 0.2
     train_end_time: Optional[float] = None
