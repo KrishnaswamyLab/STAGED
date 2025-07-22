@@ -28,10 +28,16 @@ This project uses [uv](https://docs.astral.sh/uv/) to manage dependencies. To se
     python src/main.py --mode train --config src/config/ode_config.yaml
     ```
 
+## Inference run
+
+```bash
+python3 src/inference.py --checkpoint_path results/checkpoints/checkpoints_20250722_193041/best_model.pt --config src/config/ode_config.yaml
+```
+
 ## To use jupyter notebook the following command might be necessary:
 
 ```bash
-python -m ipykernel install --user --name=staged --display-name "Python (staged)"
+uv run python -m ipykernel install --user --name staged --display-name "Python (staged)"
 ``` 
 
 ## Project Organization
