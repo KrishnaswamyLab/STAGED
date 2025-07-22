@@ -187,4 +187,12 @@ cython_debug/
 
 
 results/
-notebooks/exploration
+
+# Ignore everything in notebooks/
+notebooks/*
+
+# But don't ignore directories (so Git can traverse them)
+!notebooks/*/
+
+# And don't ignore .ipynb files anywhere in notebooks/
+!notebooks/**/*.ipynb
