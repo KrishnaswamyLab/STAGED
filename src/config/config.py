@@ -8,6 +8,7 @@ from pathlib import Path
 @dataclass
 class DataConfig:
     """Data configuration settings"""
+    data_dir: str = "data"
     expression_data: str = "data/gene_expression.csv"
     positions_data: str = "data/cell_positions.csv"
     lr_pairs_data: str = "data/ligand_receptor_pairs.csv"
@@ -129,6 +130,7 @@ def save_config(config: Config, save_path: str) -> None:
     # Convert config to dictionary
     config_dict = {
         'data': {
+            'data_dir' : config.data.data_dir,
             'expression_data': config.data.expression_data,
             'positions_data': config.data.positions_data,
             'lr_pairs_data': config.data.lr_pairs_data,

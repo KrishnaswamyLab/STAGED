@@ -3,6 +3,7 @@
 
 # Data Configuration
 data:
+  data_dir: "data"
   expression_data: "data/gene_expression.csv"
   positions_data: "data/cell_positions.csv"
   lr_pairs_data: "data/ligand_receptor_pairs.csv"
