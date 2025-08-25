@@ -173,7 +173,8 @@ class STAGEDTrainer:
             (n_prediction_steps, self.processed_data.n_cells, len(self.processed_data.genes)),
             device=self.device
         )
-        
+        attention_weights_sum = 0 
+
         # Generate ODE predictions for each time point individually
         for t in range(self.min_time, self.processed_data.gene_expression.shape[0]):
             # Get ODE predictions for this single timepoint
@@ -181,16 +182,38 @@ class STAGEDTrainer:
                 data=self.processed_data,
                 time_point=t,
                 method=self.config.training.ode_method if hasattr(self.config.training, 'ode_method') else 'rk4',
-                store_attention=False,
+                store_attention=True,
                 ode_func=self.ode_func
             )
             
             # Store prediction for current time point
             predictions[t - self.min_time] = output.predictions[0]
+            if isinstance(output.attention_weights[0], tuple):
+                # GAT returns (edge_index, attention_values)
+                edge_index, attention_values = output.attention_weights[0]
+                attention_weights_sum += torch.abs(attention_values).sum()
+            else:
+                # If it's already a tensor
+                attention_weights_sum += torch.abs(output.attention_weights[0]).sum()       
+            # break
         
         # Compute loss
         target = self.processed_data.gene_expression[self.min_time:].to(self.device)
-        return self.criterion(predictions, target)
+        base_loss = self.criterion(predictions, target)
+        # Compute L1 penalty
+        lambda_sparse = 0.01 
+        
+        # l1_penalty = lambda_sparse * attention_weights_sum / len(range(self.min_time, self.processed_data.gene_expression.shape[0]))
+        
+        if attention_weights_sum > 0:
+            base_loss_magnitude = base_loss.item()
+            scaled_lambda = lambda_sparse * base_loss_magnitude  # Adaptive scaling
+            l1_penalty = scaled_lambda * attention_weights_sum / len(range(self.min_time, self.processed_data.gene_expression.shape[0]))
+            print(f"Base loss: {base_loss.item():.6f}, L1 penalty: {l1_penalty.item():.6f}, Total: {(base_loss + l1_penalty).item():.6f}")
+            return base_loss + l1_penalty
+        else:
+            print(f"Base loss: {base_loss.item():.6f}, L1 penalty: 0.000000 (no attention weights), Total: {base_loss.item():.6f}")
+            return base_loss
 
     def fit(self):
         """Train the model"""

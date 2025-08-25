@@ -8,6 +8,10 @@ with different prediction modes and data types.
 Usage:
     python main.py --mode train --config config/train_config.yaml
     python main.py --mode eval --config config/eval_config.yaml
+    
+Usage:
+    PYTHONPATH=. python src/main.py --mode train --config src/config/ode_config.yaml
+    PYTHONPATH=. python src/inference.py --checkpoint_path results/checkpoints/checkpoints_20250812_110811/best_model.pt --config src/config/ode_config.yaml
 """
 
 import argparse
@@ -100,7 +104,7 @@ def main():
         training_output = trainer.fit()
         print(f"\nBest model saved to: {training_output.best_model_path}")
 
-    ##TODO: Implement evaluation mode
+    ## TODO: Implement evaluation mode
     # elif args.mode == 'eval':
     #     trainer, _ = initialize_trainer(config, args.checkpoint_path)
     #     evaluator = STAGEDEvaluator(trainer)

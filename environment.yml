@@ -1,7 +1,7 @@
 name: staged
 channels:
   - conda-forge
-  - pyg
+ # - pyg
   - bioconda
   - defaults
 
@@ -23,7 +23,7 @@ dependencies:
   - jupyter
   - ipykernel
   - ipywidgets
-  - pyg
+ # - pyg
   - tqdm
 
 

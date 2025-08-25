@@ -25,7 +25,7 @@ model:
   delta_lr: 2  # ligand -> receptor
   delta_rg: 1  # receptor -> gene
   delta_gg: 0  # gene -> gene (should be 0 for ODE mode)
-  add_self_loops: true
+  add_self_loops: false
 
 # Training Configuration
 training:

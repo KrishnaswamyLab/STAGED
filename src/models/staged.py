@@ -99,6 +99,8 @@ class STAGED(nn.Module):
             x, attention = gat_layer(x, edge_index, return_attention_weights=True) # only returns the last layer's attention weights
             x = F.relu(x)
             x = F.dropout(x, p=0.1, training=self.training)
+            
+        self.last_attention_weights = attention # add this
         
         return x, attention
     
@@ -207,7 +209,14 @@ class STAGED(nn.Module):
             predictions = final_state.view(1, n_cells, self.num_genes) # Shape: [1, n_cells, n_genes]
 
             # Collect attention data
-            attention_weights = self._temp_attention_storage if store_attention else None
+            # attention_weights = self._temp_attention_storage if store_attention else None
+            attention_weights = None
+            if store_attention:
+                if hasattr(self, 'last_attention_weights') and self.last_attention_weights is not None:
+                    attention_weights = [self.last_attention_weights]
+                else:
+                    attention_weights = []
+
             node_pointers = self._temp_pointer_storage if store_attention else None
             
             return PredictionOutput(
