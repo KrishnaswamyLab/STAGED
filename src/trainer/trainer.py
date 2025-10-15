@@ -202,9 +202,7 @@ class STAGEDTrainer:
         base_loss = self.criterion(predictions, target)
         # Compute L1 penalty
         lambda_sparse = 0.01 
-        
-        # l1_penalty = lambda_sparse * attention_weights_sum / len(range(self.min_time, self.processed_data.gene_expression.shape[0]))
-        
+                
         if attention_weights_sum > 0:
             base_loss_magnitude = base_loss.item()
             scaled_lambda = lambda_sparse * base_loss_magnitude  # Adaptive scaling
