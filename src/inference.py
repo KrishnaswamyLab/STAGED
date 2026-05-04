@@ -11,8 +11,8 @@ Usage:
 import argparse
 import torch
 
-from src.config.config import load_config
-from src.utils.data_factory import get_data
+from config.config import load_config
+from utils.data_factory import get_data
 from trainer.predictor import STAGEDPredictor,print_inference_summary
 
 def parse_args():
@@ -94,7 +94,7 @@ def main():
     setup_environment(config, args)
     
     # Get data using the data factory
-    data = get_data(config.data.data_type, config.system.device)
+    data = get_data(config.data, config.system.device)
     
     # Initialize trainer for inference
     predictor = STAGEDPredictor(

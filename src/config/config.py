@@ -8,12 +8,14 @@ from pathlib import Path
 @dataclass
 class DataConfig:
     """Data configuration settings"""
+    data_dir: str = "data"
     expression_data: str = "data/gene_expression.csv"
     positions_data: str = "data/cell_positions.csv"
     lr_pairs_data: str = "data/ligand_receptor_pairs.csv"
     cell_types_data: str = "data/cell_types.csv"
     prior_grns_data: str = "data/prior_grns.csv"
     data_type: str = "oscillatory"  # or "hex_grid", "damped_oscillator"
+    sim_file: str = "100_simulation_results.pkl"
     distance_threshold: float = 10.0
     validation_fraction: float = 0.2
     train_end_time: Optional[float] = None
@@ -43,6 +45,7 @@ class TrainingConfig:
     patience: int = 10
     k_steps: int = 3  # for k_step mode
     ode_method: str = "rk4"  # for ODE modes
+    time_points_per_iter: Optional[int] = None
 
 @dataclass
 class SystemConfig:
@@ -129,6 +132,7 @@ def save_config(config: Config, save_path: str) -> None:
     # Convert config to dictionary
     config_dict = {
         'data': {
+            'data_dir' : config.data.data_dir,
             'expression_data': config.data.expression_data,
             'positions_data': config.data.positions_data,
             'lr_pairs_data': config.data.lr_pairs_data,

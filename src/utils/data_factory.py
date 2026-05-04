@@ -11,8 +11,8 @@ import networkx as nx
 from typing import Dict
 
 
-from src.utils.temporal_data_generator import create_oscillatory_dynamics_data, create_damped_oscillator_data #create_hex_grid_test_data,create_square_grid_data
-from src.utils.simulated_data_processing import retrieve_simulated_data,retrieve_real_data
+from utils.temporal_data_generator import create_oscillatory_dynamics_data, create_damped_oscillator_data
+from utils.simulated_data_processing import retrieve_simulated_data,retrieve_real_data, retrieve_axalotl_data
 
 def create_simple_sinusoidal_data(
     n_time_points: int = 20,
@@ -96,9 +96,9 @@ def create_simple_sinusoidal_data(
     }
 
 
-def get_data(data_type: str, device: torch.device) -> Dict:
+def get_data(data_config: str, device: torch.device) -> Dict:
     """Get training data based on specified type."""
-    if data_type == "oscillatory":
+    if data_config.data_type == "oscillatory":
         print("Creating oscillatory dynamics data...")
         return create_oscillatory_dynamics_data(
             n_time_points=25,
@@ -109,7 +109,7 @@ def get_data(data_type: str, device: torch.device) -> Dict:
             device=device
         )
     
-    elif data_type == "damped_oscillator":
+    elif data_config.data_type == "damped_oscillator":
         print("Creating damped oscillator data...")
         return create_damped_oscillator_data(
             n_time_points=30,
@@ -119,16 +119,7 @@ def get_data(data_type: str, device: torch.device) -> Dict:
             device=device
         )
     
-    elif data_type == "hex_grid":
-        print("Creating hex grid test data...")
-        data = create_hex_grid_test_data()
-        # Convert to device
-        for key, value in data.items():
-            if isinstance(value, torch.Tensor):
-                data[key] = value.to(device)
-        return data
-    
-    elif data_type == "square_grid":
+    elif data_config.data_type == "square_grid":
         print("Creating square grid test data...")
         data = create_square_grid_data()
         # Convert to device
@@ -137,13 +128,13 @@ def get_data(data_type: str, device: torch.device) -> Dict:
                 data[key] = value.to(device)
         return data
     
-    elif data_type == "sinusoidal":
+    elif data_config.data_type == "sinusoidal":
         print("Creating simple sinusoidal data...")
         return create_simple_sinusoidal_data(device=device)
     
-    elif data_type== "simulated":
+    elif data_config.data_type== "simulated":
         print("Retriving simulated data...")
-        data = retrieve_simulated_data(data_dir="/gpfs/gibbs/pi/krishnaswamy_smita/kx44/projects/STAGED-Simulator/src/staged_simulator/tests/outputs",sim_file="50_simulation_results.pkl")
+        data = retrieve_simulated_data(data_dir=data_config.data_dir ,sim_file=data_config.sim_file)
         # Convert to device
         for key, value in data.items():
             print(f"Converting {key} to device {device}")
@@ -152,7 +143,7 @@ def get_data(data_type: str, device: torch.device) -> Dict:
                 data[key] = value.to(device)
         return data
     
-    elif data_type== "real":
+    elif data_config.data_type== "real":
         print("Retriving real data...")
         data = retrieve_real_data(data_dir="data/real")
         # Convert to device
@@ -163,8 +154,19 @@ def get_data(data_type: str, device: torch.device) -> Dict:
                 data[key] = value.to(device)
         return data
     
+    elif data_config.data_type== "axalotl":
+        print("Retriving axalotl data...")
+        data = retrieve_axalotl_data()
+        # Convert to device
+        for key, value in data.items():
+            print(f"Converting {key} to device {device}")
+
+            if isinstance(value, torch.Tensor):
+                data[key] = value.to(device)
+        return data
+
     else:
-        raise ValueError(f"Unknown data type: {data_type}")
+        raise ValueError(f"Unknown data type: {data_config.data_type}")
 
 
 def get_available_data_types():

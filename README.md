@@ -6,6 +6,40 @@
 
 Spatio Temporal Agent-Based Graph Evolution Dynamics (STAGED)
 
+## 🛠️ Installation
+
+This project uses [uv](https://docs.astral.sh/uv/) to manage dependencies. To set up the project locally:
+
+1. **Install dependencies**:
+
+    ```bash
+    uv sync  # Creates a virtual environment and installs dependencies
+    ```
+
+2. **Activate the virtual environment**:
+
+    ```bash
+    source .venv/bin/activate
+    ```
+---
+## Example of a main run
+
+    ```bash
+    python src/main.py --mode train --config src/config/ode_config.yaml
+    ```
+
+## Inference run
+
+```bash
+python3 src/inference.py --checkpoint_path results/checkpoints/checkpoints_20250722_193041/best_model.pt --config src/config/ode_config.yaml
+```
+
+## To use jupyter notebook the following command might be necessary:
+
+```bash
+uv run python -m ipykernel install --user --name staged --display-name "Python (staged)"
+``` 
+
 ## Project Organization
 
 ```

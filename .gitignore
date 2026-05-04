@@ -185,8 +185,14 @@ cython_debug/
 # PyPI configuration file
 .pypirc
 
-proof_of_concept/results/
-proof_of_concept/tests/results/
+
 results/
-notebooks/
-proof_of_concept/
+
+# Ignore everything in notebooks/
+notebooks/*
+
+# But don't ignore directories (so Git can traverse them)
+!notebooks/*/
+
+# And don't ignore .ipynb files anywhere in notebooks/
+!notebooks/**/*.ipynb

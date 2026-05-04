@@ -11,7 +11,6 @@ dependencies:
   - torchvision=0.*
   - lightning=2.*
   - torchmetrics=0.*
-  - hydra-core=1.*
   - rich=13.*
   - pre-commit=3.*
   - pytest=7.*
@@ -26,17 +25,13 @@ dependencies:
   - pyg
   - tqdm
 
-
   # --------- loggers --------- #
   # - wandb
-  - pip>=23
+  # - pip>=23
   - pip:
-      - hydra-optuna-sweeper
-      - hydra-colorlog
       - rootutils
       - torch_geometric
       
         #ODE dependencies
       - torchdiffeq
-
       - anndata

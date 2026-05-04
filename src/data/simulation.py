@@ -8,7 +8,7 @@ from IPython.display import Image
 import sys
 import os
 sys.path.append('/gpfs/gibbs/pi/krishnaswamy_smita/kx44/projects/STAGED')
-from src.data.cell import CellNetwork
+from data.cell import CellNetwork
 
 class CellSimulation:
     def __init__(self, num_cells=4, nodes_per_cell=5, delta1 = 1, delta2=2, delta3=3, deltal = 5):

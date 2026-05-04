@@ -82,7 +82,8 @@ def main():
     setup_environment(config, args)
     
     # Get data using the data factory
-    data = get_data(config.data.data_type, config.system.device)
+    print(config)
+    data = get_data(config.data, config.system.device)
     
     # Initialize trainer
     trainer = STAGEDTrainer(

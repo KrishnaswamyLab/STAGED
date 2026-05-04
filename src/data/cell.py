@@ -148,9 +148,9 @@ class CellNetwork:
         # Plot intercellular edges (ligand -> receptor)
         for edge_idx in range(data.edge_index.shape[1]):
             src, tgt = data.edge_index[:, edge_idx]
-            src_cell = src.item() // self.nodes_per_cell
+            src_cell = item() // self.nodes_per_cell
             tgt_cell = tgt.item() // self.nodes_per_cell
-            src_type = src.item() % self.nodes_per_cell
+            src_type = item() % self.nodes_per_cell
             tgt_type = tgt.item() % self.nodes_per_cell
             
             if src_cell != tgt_cell and src_type == self.L and tgt_type == self.R:
