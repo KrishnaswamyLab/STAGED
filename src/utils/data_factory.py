@@ -12,7 +12,7 @@ from typing import Dict
 
 
 from utils.temporal_data_generator import create_oscillatory_dynamics_data, create_damped_oscillator_data
-from utils.simulated_data_processing import retrieve_simulated_data,retrieve_real_data
+from utils.simulated_data_processing import retrieve_simulated_data,retrieve_real_data, retrieve_axalotl_data
 
 def create_simple_sinusoidal_data(
     n_time_points: int = 20,
@@ -154,6 +154,17 @@ def get_data(data_config: str, device: torch.device) -> Dict:
                 data[key] = value.to(device)
         return data
     
+    elif data_config.data_type== "axalotl":
+        print("Retriving axalotl data...")
+        data = retrieve_axalotl_data()
+        # Convert to device
+        for key, value in data.items():
+            print(f"Converting {key} to device {device}")
+
+            if isinstance(value, torch.Tensor):
+                data[key] = value.to(device)
+        return data
+
     else:
         raise ValueError(f"Unknown data type: {data_config.data_type}")
 

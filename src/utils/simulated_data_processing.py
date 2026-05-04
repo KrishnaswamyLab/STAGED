@@ -2,6 +2,9 @@ import os
 import pickle
 import torch
 import numpy as np
+import anndata
+import scanpy as sc
+import pandas as pd
 
 def retrieve_simulated_data(data_dir="data/raw",sim_file="simulation_results.pkl"):
     """
@@ -184,3 +187,140 @@ if __name__ == "__main__":
         file_path = os.path.join(processed_dir, f"{key}.pkl")
         with open(file_path, "wb") as f:
             pickle.dump(value, f)
+
+def retrieve_axalotl_data(data_dir="data/axalotl", processed_file="axalotl_processed.pkl"):
+    """
+    Load precomputed axolotl data. Run notebooks/precompute_axolotl.py first
+    to generate the processed pickle.
+    """
+    if not os.path.exists(data_dir):
+        raise FileNotFoundError(f"Data directory not found: {data_dir}")
+
+    path = os.path.join(data_dir, processed_file)
+    if not os.path.exists(path):
+        raise FileNotFoundError(
+            f"Processed axolotl file not found: {path}. "
+            f"Run notebooks/precompute_axolotl.py to generate it."
+        )
+
+    with open(path, "rb") as f:
+        bundle = pickle.load(f)
+
+    data = {
+        'gene_expression':       torch.tensor(bundle['gene_expression'], dtype=torch.float32),
+        'cell_positions':        torch.tensor(bundle['cell_positions'], dtype=torch.float32),
+        'genes':                 bundle['genes'],
+        'cell_type_assignments': torch.tensor(bundle['cell_type_assignments'], dtype=torch.long),
+        'prior_grns':            bundle['prior_grns'],   # dict[str, nx.DiGraph], pass through
+        'ligand_receptor_pairs': bundle['ligand_receptor_pairs'],
+        'receptor_gene_pairs':   bundle['receptor_gene_pairs'],
+    }
+    data['n_time_points'] = data['gene_expression'].shape[0]
+    data['n_cells']       = data['gene_expression'].shape[1]
+    data['n_genes']       = data['gene_expression'].shape[2]
+    return data
+
+# def retrieve_axalotl_data(data_dir="data/axalotl"):
+#     """
+#     Load real axolotl spatial-transcriptomics data.
+
+#     Expects `data_dir` to contain:
+#         - axolotl_ran.h5ad   AnnData with .obs['Annotation']
+#         - strajs.npy         spatial trajectories  (time_points, cells, 2)
+#         - gtrajs.npy         gene-expr trajectories (time_points, cells, all_genes)
+#     """
+
+
+#     if not os.path.exists(data_dir):
+#         raise FileNotFoundError(f"Data directory not found: {data_dir}")
+
+#     data = {}
+#     # 1. Load AnnData + precomputed trajectories
+#     adata = anndata.read_h5ad(os.path.join(data_dir, "axolotl_ran.h5ad"))
+#     spatial_traj = np.load(os.path.join(data_dir, "strajs.npy"), allow_pickle=True)
+#     gene_traj    = np.load(os.path.join(data_dir, "gtrajs.npy"), allow_pickle=True)
+
+#     print("I AM HERE 1")
+
+#     # 2. Highly variable genes (top 100, seurat flavor)
+#     sc.pp.highly_variable_genes(
+#         adata, flavor='seurat', n_top_genes=100, subset=False, inplace=True,
+#     )
+#     hvg_mask  = adata.var['highly_variable'].values
+#     hvg_genes = adata.var_names[hvg_mask]
+#     n_hvg     = len(hvg_genes)
+
+#     print("I AM HERE 2")
+
+    
+#     # 3. Gene expression: tensor + subset to HVGs
+#     gene_traj_hvg = gene_traj[:, :, hvg_mask]   
+#     data['gene_expression'] = torch.from_numpy(
+#         np.ascontiguousarray(gene_traj_hvg, dtype=np.float32)
+#     )
+
+#     print("I AM HERE 3")
+
+
+#     # 4. Spatial positions
+#     data['cell_positions'] = torch.tensor(spatial_traj, dtype=torch.float32)
+
+#     print("I AM HERE 4")
+
+#     # 5. Gene names
+#     data['genes'] = hvg_genes.tolist()
+
+#     # 6. Cell-type assignments
+#     cell_types        = adata.obs['Annotation'].values
+#     unique_cell_types = sorted(set(cell_types))
+#     label_to_int      = {label: idx for idx, label in enumerate(unique_cell_types)}
+#     assignments       = [label_to_int[label] for label in cell_types]
+#     data['cell_type_assignments'] = torch.tensor(assignments, dtype=torch.long)
+
+#     print("I AM HERE 6")
+
+#     # 7. Prior GRNs: fully connected, no self-loops, one per cell type
+#     full_grn = np.ones((n_hvg, n_hvg), dtype=np.float32)
+#     np.fill_diagonal(full_grn, 0.0)
+#     full_grn_tensor = torch.tensor(full_grn, dtype=torch.float32)
+#     data['prior_grns'] = [full_grn_tensor.clone() for _ in unique_cell_types]
+
+#     print("I AM HERE 7")
+
+
+#     # 8. L-R pairs from the ARTISTA CSV; R-G pairs are each receptor paired to itself
+#     lr_df = pd.read_csv("/nfs/roberts/project/pi_sk2433/bp542/Axolotl_Spatial/ARTISTA_LR_pairs.csv")
+#     ligand_receptor_pairs = list(zip(lr_df['Ligand'], lr_df['Receptor']))
+#     receptor_gene_pairs   = [(r, r) for r in sorted(set(lr_df['Receptor']))]
+
+#     valid_genes = set(data['genes'])
+#     print(f"Valid genes in axolotl data: {len(valid_genes)} HVGs")
+#     print(f"Loaded {len(ligand_receptor_pairs)} L-R pairs from ARTISTA CSV")
+
+#     filtered_lr_pairs = []
+#     dropped_lr = 0
+#     for ligand, receptor in ligand_receptor_pairs:
+#         if ligand in valid_genes and receptor in valid_genes:
+#             filtered_lr_pairs.append((ligand, receptor))
+#         else:
+#             dropped_lr += 1
+#     data['ligand_receptor_pairs'] = filtered_lr_pairs
+
+#     filtered_rg_pairs = []
+#     dropped_rg = 0
+#     for receptor, gene in receptor_gene_pairs:
+#         if receptor in valid_genes and gene in valid_genes:
+#             filtered_rg_pairs.append((receptor, gene))
+#         else:
+#             dropped_rg += 1
+#     data['receptor_gene_pairs'] = filtered_rg_pairs
+
+#     print(f"L-R pairs after HVG filter: {len(filtered_lr_pairs)} kept, {dropped_lr} dropped")
+#     print(f"R-G pairs after HVG filter: {len(filtered_rg_pairs)} kept, {dropped_rg} dropped")
+
+#     # 9. Dimensions
+#     data['n_time_points'] = data['gene_expression'].shape[0]
+#     data['n_cells']       = data['gene_expression'].shape[1]
+#     data['n_genes']       = data['gene_expression'].shape[2]
+
+#     return data

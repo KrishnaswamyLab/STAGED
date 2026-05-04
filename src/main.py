@@ -82,6 +82,7 @@ def main():
     setup_environment(config, args)
     
     # Get data using the data factory
+    print(config)
     data = get_data(config.data, config.system.device)
     
     # Initialize trainer

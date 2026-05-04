@@ -167,16 +167,19 @@ class STAGEDTrainer:
 
     def _train_ode_mode(self):
         """Train using ODE mode"""
-        # Initialize prediction collection tensor
-        n_prediction_steps = self.processed_data.gene_expression.shape[0] - self.min_time
+        all_time_points = list(range(self.min_time, self.processed_data.gene_expression.shape[0]))
+        n_steps = self.config.training.time_points_per_iter or len(all_time_points)
+        sampled_time_points = sorted(
+            torch.randperm(len(all_time_points))[:n_steps].tolist()
+        )
+        sampled_time_points = [all_time_points[i] for i in sampled_time_points]
+
         predictions = torch.zeros(
-            (n_prediction_steps, self.processed_data.n_cells, len(self.processed_data.genes)),
+            (len(sampled_time_points), self.processed_data.n_cells, len(self.processed_data.genes)),
             device=self.device
         )
-        
-        # Generate ODE predictions for each time point individually
-        for t in range(self.min_time, self.processed_data.gene_expression.shape[0]):
-            # Get ODE predictions for this single timepoint
+
+        for i, t in enumerate(tqdm(sampled_time_points, desc="  timepoints", leave=False)):
             output = self.model.predict_ode(
                 data=self.processed_data,
                 time_point=t,
@@ -184,12 +187,9 @@ class STAGEDTrainer:
                 store_attention=False,
                 ode_func=self.ode_func
             )
-            
-            # Store prediction for current time point
-            predictions[t - self.min_time] = output.predictions[0]
-        
-        # Compute loss
-        target = self.processed_data.gene_expression[self.min_time:].to(self.device)
+            predictions[i] = output.predictions[0]
+
+        target = self.processed_data.gene_expression[sampled_time_points].to(self.device)
         return self.criterion(predictions, target)
 
     def fit(self):

@@ -3,14 +3,14 @@
 
 # Data Configuration
 data:
-  data_dir: "data"
+  data_dir: "/home/jcr222/workspace/STAGED/data/axalotl"
   expression_data: "data/gene_expression.csv"
   positions_data: "data/cell_positions.csv"
   lr_pairs_data: "data/ligand_receptor_pairs.csv"
   cell_types_data: "data/cell_types.csv"
   prior_grns_data: "data/prior_grns.csv"
-  data_type: "simulated"  # or "hex_grid", "damped_oscillator", "oscillatory"
-  sim_file: "raw/50_simulation_results.pkl"
+  data_type: "axalotl"  # "simulated", "real", "axalotl", "hex_grid", "damped_oscillator", "oscillatory"
+  sim_file: "raw/50_simulation_results.pkl"  # unused for axalotl
   distance_threshold: 10.0
   validation_fraction: 0.2
   train_end_time: null
@@ -42,11 +42,12 @@ training:
   # Mode-specific parameters
   k_steps: 3  # for k_step mode
   ode_method: "rk4"  # for ODE modes
+  time_points_per_iter: 10  # subsample T timepoints per training step (set to null to use all)
 
 # Inference Configuration
 inference:
   store_attention: false
-  output_dir: "results/ode/rk4"
+  output_dir: "results/axalotl/ode/rk4"
 
 # System Configuration
 system:
@@ -59,4 +60,3 @@ system:
 logging:
   level: "INFO"
   save_logs: true
-

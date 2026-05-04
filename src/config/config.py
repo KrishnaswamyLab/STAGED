@@ -45,6 +45,7 @@ class TrainingConfig:
     patience: int = 10
     k_steps: int = 3  # for k_step mode
     ode_method: str = "rk4"  # for ODE modes
+    time_points_per_iter: Optional[int] = None
 
 @dataclass
 class SystemConfig:
