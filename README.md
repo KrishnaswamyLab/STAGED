@@ -43,52 +43,42 @@ uv run python -m ipykernel install --user --name staged --display-name "Python (
 ## Project Organization
 
 ```
-├── LICENSE            <- Open-source license if one is chosen
-├── Makefile           <- Makefile with convenience commands like `make data` or `make train`
-├── README.md          <- The top-level README for developers using this project.
-├── data
-│   ├── external       <- Data from third party sources.
-│   ├── interim        <- Intermediate data that has been transformed.
-│   ├── processed      <- The final, canonical data sets for modeling.
-│   └── raw            <- The original, immutable data dump.
+├── Makefile              <- Makefile with convenience commands like `make data` or `make train`
 │
-├── docs               <- A default mkdocs project; see www.mkdocs.org for details
+├── README.md             <- The top-level README for developers using this project.
 │
-├── models             <- Trained and serialized models, model predictions, or model summaries
+├── docs                  <- A default mkdocs project; see www.mkdocs.org for details
 │
-├── notebooks          <- Jupyter notebooks. Naming convention is a number (for ordering),
+├── notebooks             <- Jupyter notebooks. Naming convention is a number (for ordering),
 │                         the creator's initials, and a short `-` delimited description, e.g.
 │                         `1.0-jqp-initial-data-exploration`.
 │
-├── pyproject.toml     <- Project configuration file with package metadata for 
-│                         staged and configuration for tools like black
+├── scripts               <- Slurm scripts for running code on HPC
 │
-├── references         <- Data dictionaries, manuals, and all other explanatory materials.
+├── tests                 <- Experiments to make sure code is working
 │
-├── reports            <- Generated analysis as HTML, PDF, LaTeX, etc.
-│   └── figures        <- Generated graphics and figures to be used in reporting
-│
-├── requirements.txt   <- The requirements file for reproducing the analysis environment, e.g.
-│                         generated with `pip freeze > requirements.txt`
-│
-├── setup.cfg          <- Configuration file for flake8
-│
-└── staged   <- Source code for use in this project.
+└── src                   <- Source code for use in this project.
     │
-    ├── __init__.py             <- Makes staged a Python module
+    ├── __init__.py                   <- Makes staged a Python module
     │
-    ├── config.py               <- Store useful variables and configuration
+    ├── main.py                       <- CLI for training STAGED
     │
-    ├── dataset.py              <- Scripts to download or generate data
+    ├── inference.py                  <- Access point for making predictions of cell dynamics
     │
-    ├── features.py             <- Code to create features for modeling
+    ├── data                          <- A folder for data-related scripts
+    │   └── data_processor.py         <- Defines DataProcessor class, which turns raw cell position and gene expression data
     │
-    ├── modeling                
-    │   ├── __init__.py 
-    │   ├── predict.py          <- Code to run model inference with trained models          
-    │   └── train.py            <- Code to train models
+    ├── evaluation                    <- Currently empty
     │
-    └── plots.py                <- Code to create visualizations
+    ├── models                        <- Directory for the core STAGED scripts                
+    │   └── staged.py                 <- Where the actual STAGED object is defined
+    │
+    ├── trainer                       <- Contains scripts for training STAGED based on real-world or simulated data
+    │
+    └── utils                         <- Contains various utility scripts
+        ├── graph_constructor.py      <- A script to manage and update the GRN of each cell over time
+        └── graph_data_processor.py   <- Turns individual cell graphs into torch-friendly batched format
+
 ```
 
 --------
