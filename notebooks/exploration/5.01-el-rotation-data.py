@@ -19,7 +19,7 @@ import matplotlib.pyplot as plt
 from tqdm import tqdm
 
 # Add src to path so we can import STAGED modules
-sys.path.insert(0, os.path.join("..", "src"))
+sys.path.insert(0, os.path.join("..", "..", "src"))
 
 from config.config import Config, DataConfig, ModelConfig, TrainingConfig, SystemConfig, LoggingConfig, InferenceConfig
 from models.staged import STAGED
@@ -30,7 +30,7 @@ from trainer.trainer import STAGEDTrainer
 # ## 1 · Load the h5ad file produced by `RotationData.save()`
 
 # %%
-H5AD_PATH = "rotation_data.h5ad"   # adjust if the file lives elsewhere
+H5AD_PATH = os.path.join("..", "..", "simdata", "rotation_data.h5ad")   # adjust if the file lives elsewhere
 
 adata = anndata.read_h5ad(H5AD_PATH)
 print(adata)
@@ -275,7 +275,8 @@ print(f"Minimum warmup timestep (t_init): {trainer.model.get_t_init()}")
 print(f"Training will use timesteps {trainer.min_time} … {data['n_time_points'] - 1}")
 
 # %%
-training_output = trainer.fit()
+# comment out if the model is already trained
+#training_output = trainer.fit()
 print(f"\nBest checkpoint saved to: {training_output.best_model_path}")
 
 # %% [markdown]
@@ -335,6 +336,49 @@ ax.grid(True, linewidth=0.4, alpha=0.5)
 fig.tight_layout()
 plt.savefig("results/rotation/prediction_comparison.png", dpi=150)
 plt.show()
+
+# %% [markdown]
+# Now, we will sample from cell trajectories, and see how well STAGED was able to predict them.
+
+# %%
+# how many plots to make
+n_plots = 5
+n_steps = 20
+initial_time = 4
+
+# determine which cells and which genes we will track over time
+cells_to_check = np.random.choice(n_cells, n_plots, replace = False)
+genes_to_check = []
+for cell_idx in cells_to_check:
+    cell_type = cell_types_arr[cell_idx]
+    owned_indices = np.where(owning_type == cell_type)[0]
+    genes_to_check.append(np.random.choice(owned_indices, 1)[0])
+
+# get a predictor
+from trainer.predictor import STAGEDPredictor
+predictor = STAGEDPredictor(data = data, genes = genes, ligand_receptor_pairs = ligand_receptor_pairs, 
+                            receptor_gene_pairs = receptor_gene_pairs, cell_type_assignments = cell_type_assignments,
+                            prior_grns = prior_grns, config = config, checkpoint_path = training_output.best_model_path)
+
+inference_output = predictor.inference(initial_time = initial_time, prediction_steps = n_steps, store_attention = False)
+
+# %%
+predicted_trajectories = inference_output.predictions
+true_trajectories = trainer.processed_data.gene_expression[initial_time + 1 : initial_time + n_steps + 1]
+predicted_trajectories.shape, true_trajectories.shape
+
+# subset these to only show the selected genes
+for plot_idx in range(n_plots):
+    true = true_trajectories[:, cells_to_check[plot_idx], genes_to_check[plot_idx]].detach().cpu()
+    pred = predicted_trajectories[:, cells_to_check[plot_idx], genes_to_check[plot_idx]].detach().cpu()
+    time = np.arange(initial_time, initial_time + n_steps)
+    plt.scatter(time, pred, label = 'Predicted Gene Expression')
+    plt.scatter(time, true, label = 'True Gene Expression')
+    plt.xlabel('Time')
+    plt.ylabel('Gene Expression')
+    plt.legend()
+    plt.title(f'Cell {cells_to_check[plot_idx]}, Gene {genes_to_check[plot_idx]}')
+    plt.show()
 
 # %% [markdown]
 # ## 8 · Per-cell-type prediction error
