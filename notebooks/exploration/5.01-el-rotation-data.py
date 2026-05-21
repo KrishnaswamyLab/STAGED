@@ -275,8 +275,7 @@ print(f"Minimum warmup timestep (t_init): {trainer.model.get_t_init()}")
 print(f"Training will use timesteps {trainer.min_time} … {data['n_time_points'] - 1}")
 
 # %%
-# comment out if the model is already trained
-#training_output = trainer.fit()
+training_output = trainer.fit()
 print(f"\nBest checkpoint saved to: {training_output.best_model_path}")
 
 # %% [markdown]

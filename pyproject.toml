@@ -21,4 +21,5 @@ dependencies = [
     "torchdiffeq",
     "anndata",
     "jupytext>=1.19.3",
+    "papermill>=2.6.0",
 ]
