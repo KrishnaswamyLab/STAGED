@@ -9,6 +9,7 @@ import pickle
 from models.staged import STAGED
 from data.data_processor import DataProcessor
 from config.config import Config
+from utils.ode import ode_int
 
 @dataclass
 class InferenceOutput:
@@ -55,6 +56,7 @@ class STAGEDPredictor:
         receptor_gene_pairs: List[tuple],
         cell_type_assignments: Any,
         prior_grns: Dict[Any, Any],
+        autoregressive = False,
         config: Config,
         checkpoint_path: Optional[str] = None,
     ):
@@ -79,6 +81,9 @@ class STAGEDPredictor:
 
         # Store checkpoint path for metadata
         self.checkpoint_path = checkpoint_path
+
+        # should we compute the predictions autoregressively?
+        self.autoregressive = autoregressive
 
         # Initialize model with proper configuration
         self.model = STAGED(
@@ -233,40 +238,52 @@ class STAGEDPredictor:
                     if hasattr(self.config.training, 'ode_method') 
                     else 'rk4'
                 )
-            
-            # Generate predictions one step at a time
-            current_time = initial_time
-            for _ in range(prediction_steps):
-                # Get prediction for current time point
-                output = predict_method(
-                    data=self.processed_data,
-                    time_point=current_time,
-                    cell_ids=cell_ids,
-                    store_attention=store_attention,
-                    ode_func=self.ode_func,
-                    **method_kwargs
-                )
-                
-                # Add time dimension to predictions if needed
-                pred = output.predictions
-                if self.config.training.prediction_mode != "ode":
-                    pred = pred.unsqueeze(0)
-                
-                predictions.append(pred)
-                
-                if store_attention and output.attention_weights is not None:
-                    attention_weights.append(output.attention_weights)
-                
-                current_time += 1
-            
-            # Stack predictions along time dimension
-            predictions = torch.cat(predictions, dim=0)  # Shape: (times, cells, genes)
+           
+            if self.autoregressive:
+                # build each prediction off of the last
+                initial_state = self.processed_data.gene_expression[initial_time, :, :].detach()
+                # the range of times we want predictions for
+                time_points = torch.arange(initial_time, initial_time + prediction_steps)
+                # get predictions
+                predictions = ode_int(func = self.ode_func,
+                                      y0 = initial_state,
+                                      t = time_points)
 
-            if store_attention and attention_weights:
-                attention_weights = torch.stack(attention_weights, dim=0)
+
+            else:
+                # Generate predictions one step at a time
+                current_time = initial_time
+                for _ in range(prediction_steps):
+                    # Get prediction for current time point
+                    output = predict_method(
+                        data=self.processed_data,
+                        time_point=current_time,
+                        cell_ids=cell_ids,
+                        store_attention=store_attention,
+                        ode_func=self.ode_func,
+                        **method_kwargs
+                    )
+                    
+                    # Add time dimension to predictions if needed
+                    pred = output.predictions
+                    if self.config.training.prediction_mode != "ode":
+                        pred = pred.unsqueeze(0)
+                    
+                    predictions.append(pred)
+                    
+                    if store_attention and output.attention_weights is not None:
+                        attention_weights.append(output.attention_weights)
+                    
+                    current_time += 1
             
-            # Create time points list
-            time_points = list(range(initial_time, initial_time + prediction_steps))
+                # Stack predictions along time dimension
+                predictions = torch.cat(predictions, dim=0)  # Shape: (times, cells, genes)
+
+                if store_attention and attention_weights:
+                    attention_weights = torch.stack(attention_weights, dim=0)
+            
+                # Create time points list
+                time_points = list(range(initial_time, initial_time + prediction_steps))
             
             return InferenceOutput(
                 predictions=predictions,
