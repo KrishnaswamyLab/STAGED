@@ -9,7 +9,7 @@ import pickle
 from models.staged import STAGED
 from data.data_processor import DataProcessor
 from config.config import Config
-from utils.ode import ode_int
+from utils.ode import ode_integration
 
 @dataclass
 class InferenceOutput:
@@ -56,8 +56,8 @@ class STAGEDPredictor:
         receptor_gene_pairs: List[tuple],
         cell_type_assignments: Any,
         prior_grns: Dict[Any, Any],
-        autoregressive = False,
         config: Config,
+        autoregressive = False,
         checkpoint_path: Optional[str] = None,
     ):
         # Setup configuration
@@ -241,13 +241,18 @@ class STAGEDPredictor:
            
             if self.autoregressive:
                 # build each prediction off of the last
-                initial_state = self.processed_data.gene_expression[initial_time, :, :].detach()
+                initial_state = self.processed_data.gene_expression[initial_time, :, :].detach().view(-1)
+                #assert initial_state.shape == [100, 100], f"initial_state has shape {initial_state.shape} and the gene_expressions have shape {self.processed_data.gene_expression.shape}"
                 # the range of times we want predictions for
                 time_points = torch.arange(initial_time, initial_time + prediction_steps)
                 # get predictions
-                predictions = ode_int(func = self.ode_func,
+                predictions = ode_integration(func = self.ode_func,
                                       y0 = initial_state,
                                       t = time_points)
+
+                # reshape to match (n_times, n_cells, n_genes) format
+                n_cells, n_genes, = self.processed_data.gene_expression.shape[1], self.processed_data.gene_expression.shape[2]
+                predictions = predictions.reshape(len(time_points), n_cells, n_genes)
 
 
             else:

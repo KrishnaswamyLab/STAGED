@@ -243,7 +243,7 @@ config = Config(
         learning_rate=1e-3,
         weight_decay=1e-5,
         ode_method="rk4",
-        time_points_per_iter=5,        # subsample T timepoints per gradient step
+        time_points_per_iter=15,        # subsample T timepoints per gradient step
     ),
     system=SystemConfig(
         device=device_str,
@@ -294,49 +294,6 @@ plt.show()
 
 # %% [markdown]
 # ## 7 · Qualitative prediction check
-#
-# For a handful of timesteps we compare the STAGED one-step ODE prediction
-# against the ground-truth gene expression.  We reduce the high-dimensional
-# output to a scalar by computing the per-cell RMS expression value.
-
-# %%
-trainer.model.eval()
-device = trainer.device
-
-n_check = min(8, data["n_time_points"] - trainer.min_time - 1)
-check_times = np.linspace(trainer.min_time, data["n_time_points"] - 2, n_check, dtype=int)
-
-pred_rms  = []   # predicted RMS per timestep (averaged over cells)
-true_rms  = []   # ground-truth RMS per timestep
-
-with torch.no_grad():
-    for t in tqdm(check_times, desc="Evaluating"):
-        output = trainer.model.predict_ode(
-            data=trainer.processed_data,
-            time_point=int(t),
-            method=config.training.ode_method,
-            store_attention=False,
-            ode_func=trainer.ode_func,
-        )
-        pred = output.predictions[0].cpu()            # (C, G)
-        true = trainer.processed_data.gene_expression[t + 1].cpu()  # (C, G)
-
-        pred_rms.append(pred.pow(2).mean(dim=-1).sqrt().mean().item())
-        true_rms.append(true.pow(2).mean(dim=-1).sqrt().mean().item())
-
-fig, ax = plt.subplots(figsize=(8, 4))
-ax.plot(check_times, true_rms, "o-", label="Ground truth", linewidth=1.5)
-ax.plot(check_times, pred_rms, "s--", label="STAGED prediction", linewidth=1.5)
-ax.set_xlabel("Timestep  t  (predicting t+1)")
-ax.set_ylabel("Mean per-cell RMS expression")
-ax.set_title("STAGED vs ground truth — Rotation Simulator")
-ax.legend()
-ax.grid(True, linewidth=0.4, alpha=0.5)
-fig.tight_layout()
-plt.savefig("results/rotation/prediction_comparison.png", dpi=150)
-plt.show()
-
-# %% [markdown]
 # Now, we will sample from cell trajectories, and see how well STAGED was able to predict them.
 
 # %%
@@ -378,41 +335,3 @@ for plot_idx in range(n_plots):
     plt.legend()
     plt.title(f'Cell {cells_to_check[plot_idx]}, Gene {genes_to_check[plot_idx]}')
     plt.show()
-
-# %% [markdown]
-# ## 8 · Per-cell-type prediction error
-#
-# Break down the MSE at the last evaluated timestep by cell type, which
-# lets us see whether the model performs uniformly across types.
-
-# %%
-t_final = int(check_times[-1])
-
-with torch.no_grad():
-    output = trainer.model.predict_ode(
-        data=trainer.processed_data,
-        time_point=t_final,
-        method=config.training.ode_method,
-        store_attention=False,
-        ode_func=trainer.ode_func,
-    )
-
-pred_final = output.predictions[0].cpu()                               # (C, G)
-true_final = trainer.processed_data.gene_expression[t_final + 1].cpu() # (C, G)
-
-mse_per_cell = (pred_final - true_final).pow(2).mean(dim=-1)           # (C,)
-ct_labels    = cell_type_assignments.numpy()
-
-fig, ax = plt.subplots(figsize=(6, 4))
-for ct in range(n_types):
-    mask_ct = ct_labels == ct
-    ax.bar(ct, mse_per_cell[mask_ct].mean().item(),
-           label=f"Type {ct}", alpha=0.8)
-ax.set_xlabel("Cell type")
-ax.set_ylabel("Mean MSE")
-ax.set_title(f"Per-type prediction MSE at t={t_final}→{t_final+1}")
-ax.legend()
-ax.grid(True, axis="y", linewidth=0.4, alpha=0.5)
-fig.tight_layout()
-plt.savefig("results/rotation/per_type_mse.png", dpi=150)
-plt.show()
