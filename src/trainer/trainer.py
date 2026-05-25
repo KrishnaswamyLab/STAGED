@@ -170,9 +170,9 @@ class STAGEDTrainer:
         all_time_points = list(range(self.min_time, self.processed_data.gene_expression.shape[0]))
         n_steps = self.config.training.time_points_per_iter or len(all_time_points)
         sampled_time_points = sorted(
-            torch.randperm(len(all_time_points))[:n_steps].tolist()
+            torch.randperm(len(all_time_points) - 1)[:n_steps].tolist() # make sure we don't take the last time point
         )
-        sampled_time_points = [all_time_points[i] for i in sampled_time_points]
+        sampled_time_points = np.array([all_time_points[i] for i in sampled_time_points])
 
         predictions = torch.zeros(
             (len(sampled_time_points), self.processed_data.n_cells, len(self.processed_data.genes)),
@@ -189,7 +189,7 @@ class STAGEDTrainer:
             )
             predictions[i] = output.predictions[0]
 
-        target = self.processed_data.gene_expression[sampled_time_points].to(self.device)
+        target = self.processed_data.gene_expression[sampled_time_points + 1].to(self.device) # shift 1 to the right, since we want to predict the next step
         return self.criterion(predictions, target)
 
     def fit(self):
