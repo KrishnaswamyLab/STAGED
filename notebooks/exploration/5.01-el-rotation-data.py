@@ -357,7 +357,7 @@ for cell_idx in cells_to_check:
 from trainer.predictor import STAGEDPredictor
 predictor = STAGEDPredictor(data = data, genes = genes, ligand_receptor_pairs = ligand_receptor_pairs, 
                             receptor_gene_pairs = receptor_gene_pairs, cell_type_assignments = cell_type_assignments,
-                            prior_grns = prior_grns, config = config, checkpoint_path = training_output.best_model_path)
+                            prior_grns = prior_grns, autoregressive = True, config = config, checkpoint_path = training_output.best_model_path)
 
 inference_output = predictor.inference(initial_time = initial_time, prediction_steps = n_steps, store_attention = False)
 
